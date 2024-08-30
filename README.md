@@ -60,7 +60,7 @@ After successfully building the project, you can run the Windows Forms applicati
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ### Acknowledgements
-OpenCVSharp for providing an easy way to integrate OpenCV with C#.
-g2o and Eigen for their powerful optimization and mathematical tools.
-OpenTK for simplifying 3D rendering in C#.
-[ORB_SLAM2](https://github.com/raulmur/ORB_SLAM2) for indirect visual slam knowledge.
+OpenCVSharp for providing an easy way to integrate OpenCV with C#.</br>
+g2o and Eigen for their powerful optimization and mathematical tools.</br>
+OpenTK for simplifying 3D rendering in C#.</br>
+[ORB_SLAM2](https://github.com/raulmur/ORB_SLAM2) for indirect visual slam knowledge.</br>
