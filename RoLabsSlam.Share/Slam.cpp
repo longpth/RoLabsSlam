@@ -48,6 +48,10 @@ void Slam::Stop() {
 
 void Slam::Track() {
 
+    // Step 1: Read the frame from video/camera, do the ORB feature extraction and store in frame
+    // Step 2: Do the initialization if the initialization has not been done, else do the tracking with the motion model
+    // Step 3: Update map points with the new feature points
+
     cv::Mat image;
     {
         std::lock_guard<std::mutex> lock(_image_mutex);
@@ -66,6 +70,13 @@ void Slam::Track() {
         if (!_initializationDone)
         {
             initialization();
+
+            // velocity = currentPose * previousPose_invert
+            _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+
+            // add map points
+            updateMap(_currentFrame->GetMapPoints());
+
         }
         else
         {
@@ -94,6 +105,13 @@ void Slam::GetDebugKeyPoints(std::vector<cv::KeyPoint>* keypointsCurrent, std::v
 
 void Slam::initialization()
 {
+    // The initialization process is for finding the camera pose from the 2 first frames
+    // Step 1: finding the orb keypoints from the 2 frames
+    // Step 2: do the feature matching to have the good_maches which contains the matched indexes between 2 frames
+    // Step 3: find the Essential Matrix
+    // Step 4: recover pose from the matches keypoints and essential matrix
+    // Step 5: triangulate the 3d points from the recovered pose and the the 2d matched keypoints from 2 consecutive frames 
+
     // Ensure that both frames are valid
     if (!_currentFrame || !_previousFrame || _currentFrame->KeyPoints().empty() || _previousFrame->KeyPoints().empty()) {
         std::cerr << "Error: Invalid frames or no keypoints detected." << std::endl;
@@ -133,19 +151,17 @@ void Slam::initialization()
 
     Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
 
-
-    // velocity = currentPose * previousPose_invert
-    _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
-
-    // add map points
-    updateMap(_currentFrame->GetMapPoints());
-
     // Mark initialization as done
     _initializationDone = true;
 }
 
 void Slam::trackWithMotionModel()
 {
+    // Step 1: Set the current camera pose by multiply the velocity and the previous camera pose
+    // Step 2: Because we have the current camera pose, so we can do the projection search from 3d map points to match the 3d map points with the current frame keypoints
+    // Step 3: Do the pose optimization using g2o with the map points and current frame keypoints
+    // Step 4: calculate the camera velocity: velocity = currentPose * previousPose_invert
+
     // initialize map points vector with the size of keypoints, but currently the map points are nulls
     _currentFrame->InitializeMapPoints();
 
@@ -154,6 +170,7 @@ void Slam::trackWithMotionModel()
     // set the current camera pose by the motion model: current_pose = velocity*previous_pose
     _currentFrame->SetTcw(_velocity * _previousFrame->Tcw());
 
+    // 15 is the number I refer from ORB_SLAM2
     int trackedPtsCnt = SearchByProjection(_currentFrame, _map, _intrinsicCameraMatrix, 15);
 
     STOP_MEASURE_TIME("MatchKeyPoints")

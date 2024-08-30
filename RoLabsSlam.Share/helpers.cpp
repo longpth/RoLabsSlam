@@ -259,6 +259,9 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
             continue; // Skip points outside image bounds
         }
 
+        // Find 2 best indexes from key points which matches to the projected map point
+        // then select one has the better descriptor distance
+
         double bestDistance1 = std::numeric_limits<double>::max();
         double bestDistance2 = std::numeric_limits<double>::max();
         int bestIndex1 = -1;

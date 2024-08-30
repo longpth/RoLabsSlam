@@ -8,6 +8,8 @@
 #include "g2o/types/types_seven_dof_expmap.h"
 #include "Eigen/StdVector"
 
+
+// This function I refered from ORB-SLAM2 
 int Optimizer::PoseOptimization(std::shared_ptr<Frame> frame, const CameraInfo& camInfo)
 {
     g2o::SparseOptimizer optimizer;
