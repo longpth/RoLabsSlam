@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{07216a78-47dd-49ee-92ca-c79bc9b5fb37}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Frame.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)helpers.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)MapPoint.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Optimizer.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Slam.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)SlamExport.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Frame.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)helpers.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)MapPoint.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)MyTypes.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)my_functions.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Optimizer.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Slam.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)SlamExport.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)types_c.h" />
+  </ItemGroup>
+</Project>

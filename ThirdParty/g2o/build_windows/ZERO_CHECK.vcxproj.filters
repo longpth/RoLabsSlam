@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\work\125.MyRobotics\02.RoLabs\ORB_SLAM2\Thirdparty\g2o\build_windows\CMakeFiles\9c755947c37980476b39e8ac91b1220a\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{79BB7294-293B-3897-AA9E-709F853CC4D2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

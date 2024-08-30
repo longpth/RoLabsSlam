@@ -1,0 +1,16 @@
+x64-windows-static/
+x64-windows-static/debug/
+x64-windows-static/debug/lib/
+x64-windows-static/debug/lib/gif.lib
+x64-windows-static/include/
+x64-windows-static/include/gif_lib.h
+x64-windows-static/lib/
+x64-windows-static/lib/gif.lib
+x64-windows-static/share/
+x64-windows-static/share/gif/
+x64-windows-static/share/gif/vcpkg-cmake-wrapper.cmake
+x64-windows-static/share/giflib/
+x64-windows-static/share/giflib/copyright
+x64-windows-static/share/giflib/usage
+x64-windows-static/share/giflib/vcpkg.spdx.json
+x64-windows-static/share/giflib/vcpkg_abi_info.txt

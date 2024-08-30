@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "RoLabsSlam.Windows.Test": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
