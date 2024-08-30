@@ -9,9 +9,9 @@ RoLabsSlam/
 ├── .vs/                            # Visual Studio settings folder
 ├── opencv_files/                   # Prebuilt OpenCV 4 libraries from https://github.com/shimat/opencv_files
 ├── OpenCvSharp/                    # Wrapper library for OpenCV in C#, reference: https://github.com/shimat/opencvsharp
-├── RoLabsSlam.Share/               # Shared resources and utilities
-├── RoLabsSlam.Windows/             # Main Windows Forms application
-├── RoLabsSlam.Windows.Test/        # Unit and integration tests for the Windows Forms application
+├── RoLabsSlam.Share/               # Visual slam implementation C++ code
+├── RoLabsSlam.Windows/             # Exported DLL from C++ project
+├── RoLabsSlam.Windows.Test/        # Main Windows Forms application
 ├── RoLabsSlamSharp/                # C# bindings and utilities
 ├── tesseract_vcpkg_0.0.8-beta/     # Tesseract OCR dependencies via vcpkg (for future use)
 ├── ThirdParty/                     # Additional third-party dependencies (e.g., g2o, Eigen)
