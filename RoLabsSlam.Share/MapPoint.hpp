@@ -36,7 +36,7 @@ public:
     void SetDescriptor(cv::Mat descriptor);
 
 private:
-    cv::Point3d _position;                // 3D position of the map point
+    cv::Point3d _position;                                       // 3D position of the map point
     std::map<uint64_t, std::shared_ptr<Frame>> _observers;       // Frames associated with this map point
 
     cv::Mat _descriptor;

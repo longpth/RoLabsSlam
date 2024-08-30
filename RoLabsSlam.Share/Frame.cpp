@@ -1,9 +1,10 @@
 #include "Frame.hpp"
+#include "Helpers.hpp"
 
 uint64_t Frame::frameCount = 0;
 
 Frame::Frame(const cv::Mat& image) : _orb(cv::ORB::create()) {
-    detectAndCompute(image);
+    detectAndCompute2(image);
     // Define the Twc matrix at the origin (identity matrix)
     _Tcw = cv::Mat::eye(4, 4, CV_64F); // 4x4 identity matrix
     _id = frameCount++;
@@ -59,4 +60,31 @@ void Frame::detectAndCompute(const cv::Mat& image) {
     // Set the class member variables to the merged results
     _keypoints = allKeypoints;
     _descriptors = allDescriptors;
+}
+
+void Frame::detectAndCompute2(const cv::Mat& image) {
+
+    // Parameters for goodFeaturesToTrack
+    int maxCorners = 1000; // Maximum number of good features to retain per cell
+    double qualityLevel = 0.01; // Quality level for good features
+    double minDistance = 10.0; // Minimum distance between corners
+    int blockSize = 3; // Block size for corner detection
+    bool useHarrisDetector = false; // Use Harris or Shi-Tomasi corner detector
+    double k = 0.04; // Free parameter for Harris detector
+
+    // Detect good features to track in the cell
+    std::vector<cv::Point2f> goodFeatures;
+    cv::goodFeaturesToTrack(image, goodFeatures, maxCorners, qualityLevel, minDistance, cv::Mat(), blockSize, useHarrisDetector, k);
+
+    // Convert good features to keypoints
+    std::vector<cv::KeyPoint> goodKeypoints;
+    cv::KeyPoint::convert(goodFeatures, goodKeypoints);
+
+    // Detect and compute descriptors for the good keypoints in the current cell
+    cv::Mat goodFeaturesDescriptors;
+    _orb->compute(image, goodKeypoints, goodFeaturesDescriptors);
+
+    // Set the class member variables to the merged results
+    _keypoints = goodKeypoints;
+    _descriptors = goodFeaturesDescriptors;
 }

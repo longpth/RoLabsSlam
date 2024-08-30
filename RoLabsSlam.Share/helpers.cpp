@@ -1,6 +1,8 @@
 
-#include "helpers.hpp"
+#include "Helpers.hpp"
 #include "MapPoint.hpp"
+
+const int ORB_HARMING_DISTANCE_THRESHOLD = 100;
 
 std::vector<cv::Point3d> MyTriangulatePoints(
     const cv::Mat& P1, const cv::Mat& P2,
@@ -199,6 +201,8 @@ std::vector<cv::Point3d> MyTriangulatePoints(
     const std::vector<cv::Point2f>& points1,
     const std::vector<cv::Point2f>& points2)
 {
+    assert(points1.size() == points2.size()); // size of poth point vectors must equal
+
     std::vector<cv::Point3d> points3D;
 
     for (size_t i = 0; i < points1.size(); i++)
@@ -226,7 +230,9 @@ std::vector<cv::Point3d> MyTriangulatePoints(
     return points3D;
 }
 
-int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius) {
+int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask)
+{
+    mask.resize(currentFrame->KeyPoints().size(), false);
     cv::Matx33d K = intrinsicCameraMatrix;
     cv::Matx44d Tcw = currentFrame->Tcw(); // 4x4 transformation matrix
     int trackedPtsCnt = 0;
@@ -236,6 +242,9 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
 
     int width = currentFrame->Width(); // Assuming you have a method to get frame width
     int height = currentFrame->Height(); // Assuming you have a method to get frame height
+
+    int outPointCnt = 0;
+    int descriptorDistanceOutCnt = 0;
 
     for (const auto& mp_ptr : mapPoints) {
 
@@ -247,7 +256,10 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
         cv::Matx41d posMat(pos.x, pos.y, pos.z, 1.0);
         cv::Matx41d posProj = Tcw * posMat;
 
-        if (posProj(2) <= 0) continue; // Skip points that are behind the camera
+        if (posProj(2) <= 0)
+        {
+            continue; // Skip points that are behind the camera
+        }
 
         // Project to 2D
         cv::Mat point3dMat = (cv::Mat_<double>(3, 1) << posProj(0) / posProj(2), posProj(1) / posProj(2), 1.0);
@@ -256,16 +268,13 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
 
         // Ensure uv is within image bounds
         if (uv.x < 0 || uv.x >= width || uv.y < 0 || uv.y >= height) {
+            outPointCnt++;
             continue; // Skip points outside image bounds
         }
 
-        // Find 2 best indexes from key points which matches to the projected map point
-        // then select one has the better descriptor distance
+        // search all the point within the radius
 
-        double bestDistance1 = std::numeric_limits<double>::max();
-        double bestDistance2 = std::numeric_limits<double>::max();
-        int bestIndex1 = -1;
-        int bestIndex2 = -1;
+        std::vector<int> indicesWithinRadius;
 
         for (size_t j = 0; j < currentFrameKps.size(); ++j) {
             const cv::KeyPoint& kp = currentFrameKps[j];
@@ -274,48 +283,45 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
 
             double distance = cv::norm(uv - kp_pt_double);
 
-            // Compare distance between projected point and keypoint
-            if (distance <= static_cast<double>(searchRadius)) {
-                if (distance < bestDistance1) {
-                    bestDistance2 = bestDistance1;
-                    bestIndex2 = bestIndex1;
-
-                    bestDistance1 = distance;
-                    bestIndex1 = j;
-                }
-                else if (distance < bestDistance2) {
-                    bestDistance2 = distance;
-                    bestIndex2 = j;
-                }
+            // Add the index to the vector if the distance is within the search radius
+            if (distance <= searchRadius) {
+                indicesWithinRadius.push_back(j);
             }
         }
 
-        if (bestIndex1 != -1) {
+        cv::Mat mapPointDescriptor = mp_ptr->GetDescriptor(); // Retrieve the descriptor from MapPoint
+        double bestDescriptorDistance = std::numeric_limits<double>::max();
+        int bestIndex = -1;
 
-            // Descriptor distance check
-            cv::Mat queryDescriptor1 = currentFrameDesc.row(bestIndex1); // Descriptor of the current keypoint
-            cv::Mat mapPointDescriptor = mp_ptr->GetDescriptor(); // Retrieve the descriptor from MapPoint
+        for (int idx : indicesWithinRadius) {
+            // Retrieve the descriptor of the current keypoint
+            cv::Mat queryDescriptor = currentFrameDesc.row(idx);
 
-            double descriptorDistance1 = cv::norm(queryDescriptor1, mapPointDescriptor, cv::NORM_HAMMING); // Euclidean distance
+            // Calculate the Hamming distance between the current descriptor and the MapPoint descriptor
+            double descriptorDistance = cv::norm(queryDescriptor, mapPointDescriptor, cv::NORM_HAMMING);
 
-            double descriptorDistance2 = std::numeric_limits<double>::max();
-
-            if (bestIndex2 != -1)
-            {
-                cv::Mat queryDescriptor2 = currentFrameDesc.row(bestIndex2); // Descriptor of the current keypoint
-                descriptorDistance2 = cv::norm(queryDescriptor2, mapPointDescriptor, cv::NORM_HAMMING); // Euclidean distance
+            // Check if this is the best (shortest) distance
+            if (descriptorDistance < bestDescriptorDistance) {
+                bestDescriptorDistance = descriptorDistance;
+                bestIndex = idx;
             }
+        }
 
-            int bestIndex = descriptorDistance1 < descriptorDistance2 ? bestIndex1 : bestIndex2;
-            double bestDescriptorDistance = descriptorDistance1 < descriptorDistance2 ? descriptorDistance1 : descriptorDistance2;
-
-            if (bestDescriptorDistance < 100) // Threshold for descriptor similarity
-            {
-                currentFrame->GetMapPoints()[bestIndex] = mp_ptr; // Store map point in current frame
-                trackedPtsCnt++;
-            }
+        if (bestDescriptorDistance < ORB_HARMING_DISTANCE_THRESHOLD)
+        {
+            currentFrame->GetMapPoints()[bestIndex] = mp_ptr; // Store map point in current frame
+            mp_ptr->AddObservation(currentFrame); // Add observer
+            mask[bestIndex] = true; //mark that this index of keypoint has an associated map point
+            trackedPtsCnt++;
+        }
+        else
+        {
+            descriptorDistanceOutCnt++;
         }
     }
+
+    //std::cout << "[Cpp] search by projection " << mapPoints.size() << " 2d out point count " << outPointCnt << std::endl;
+    //std::cout << "[Cpp] search by projection " << mapPoints.size() << " descriptorDistanceOutCnt " << descriptorDistanceOutCnt << std::endl;
 
     return trackedPtsCnt;
 }

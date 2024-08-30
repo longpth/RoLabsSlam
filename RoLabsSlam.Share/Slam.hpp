@@ -25,10 +25,12 @@ private:
     void initialization();
     void updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints);
     void trackWithMotionModel();
+    std::vector<cv::Point2f> trackKeypointsOpticalFlow(const cv::Mat& prevImg, const cv::Mat& currImg, const std::vector<cv::Point2f>& currKeypoints, std::vector<bool>& mask);
 
     std::mutex _image_mutex;
     mutable std::mutex _frame_mutex;
     cv::Mat _currentImage;
+    cv::Mat _previousImage;
     bool _running;
 
     int _frameCount;

@@ -20,7 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\RolabsSlam.Share\Frame.cpp" />
-    <ClCompile Include="..\RoLabsSlam.Share\helpers.cpp" />
+    <ClCompile Include="..\RoLabsSlam.Share\Helpers.cpp" />
     <ClCompile Include="..\RoLabsSlam.Share\MapPoint.cpp" />
     <ClCompile Include="..\RoLabsSlam.Share\Optimizer.cpp" />
     <ClCompile Include="..\RolabsSlam.Share\Slam.cpp" />
@@ -28,7 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\RolabsSlam.Share\Frame.hpp" />
-    <ClInclude Include="..\RoLabsSlam.Share\helpers.hpp" />
+    <ClInclude Include="..\RoLabsSlam.Share\Helpers.hpp" />
     <ClInclude Include="..\RoLabsSlam.Share\MapPoint.hpp" />
     <ClInclude Include="..\RolabsSlam.Share\my_functions.h" />
     <ClInclude Include="..\RoLabsSlam.Share\Optimizer.hpp" />

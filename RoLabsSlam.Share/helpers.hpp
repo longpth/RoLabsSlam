@@ -26,4 +26,6 @@ extern std::vector<cv::Point3d> MyTriangulatePoints(
     const std::vector<cv::Point2f>& points1,
     const std::vector<cv::Point2f>& points2);
 
-extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius);
+extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
+
+extern int HammingDistance(int a, int b);

@@ -1,5 +1,6 @@
 #include "MapPoint.hpp"
 #include "Frame.hpp"
+#include "Helpers.hpp"
 
 MapPoint::MapPoint(const cv::Point3d& position)
     : _position(position) {}

@@ -95,6 +95,7 @@ public:
 
 private:
     void detectAndCompute(const cv::Mat& image);
+    void detectAndCompute2(const cv::Mat& image);
 
     std::vector<cv::KeyPoint> _keypoints;
     cv::Mat _descriptors;
