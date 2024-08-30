@@ -9,7 +9,7 @@ RoLabsSlam/
 ├── .vs/                            # Visual Studio settings folder
 ├── opencv_files/                   # Prebuilt OpenCV 4 libraries from https://github.com/shimat/opencv_files
 ├── OpenCvSharp/                    # Wrapper library for OpenCV in C#, reference: https://github.com/shimat/opencvsharp
-├── RoLabsSlam.Share/               # Implementation C++ code
+├── RoLabsSlam.Share/               # Visual slam implementation C++ code
 ├── RoLabsSlam.Windows/             # Exported DLL from C++ project
 ├── RoLabsSlam.Windows.Test/        # Main Windows Forms application
 ├── RoLabsSlamSharp/                # C# bindings and utilities
