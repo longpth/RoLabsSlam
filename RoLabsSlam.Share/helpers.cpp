@@ -73,6 +73,10 @@ void FindRtAndTriangulate(
     // Triangulate points
     std::vector<cv::Point3d> point3Ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints);
 
+    double invMedianDepth = Normalize3DPoints(point3Ds);
+
+    t *= invMedianDepth;
+
     std::vector<std::shared_ptr<MapPoint>>& current_map_points = currentFrame->GetMapPoints();
     std::vector<std::shared_ptr<MapPoint>>& previous_map_points = previousFrame->GetMapPoints();
 
@@ -88,8 +92,8 @@ void FindRtAndTriangulate(
             continue; // Skip points with Z < 0
 
         std::shared_ptr<MapPoint> mapPoint = std::make_shared<MapPoint>();
-        mapPoint->AddObservation(previousFrame);
-        mapPoint->AddObservation(currentFrame);
+        mapPoint->AddObservation(previousFrame, i);
+        mapPoint->AddObservation(currentFrame, i);
         mapPoint->SetPosition(point3Ds[i]);
         mapPoint->SetDescriptor(validCurrentDescriptors.row(i));
 
@@ -124,6 +128,56 @@ void FindRtAndTriangulate(
 
     // Update the current frame's transformation matrix (camera to world)
     currentFrame->SetTcw(transformation);
+}
+
+double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw)
+{
+    std::vector<double> depths;
+
+    // Output the sorted points and their depths
+    for (const auto& point : point3Ds) {
+        // Convert the 3D point to homogeneous coordinates (4x1 vector)
+        cv::Mat pointWorldHomogeneous = (cv::Mat_<double>(4, 1) << point.x, point.y, point.z, 1.0);
+
+        // Transform the point from world coordinates to camera coordinates using Tcw
+        cv::Mat pointCameraHomogeneous = Tcw * pointWorldHomogeneous;
+
+        // The depth (z value) is the third element of the resulting point in camera coordinates
+        double depth = pointCameraHomogeneous.at<double>(2);
+
+        if (depth >= 0) {
+            depths.push_back(depth);
+        }
+    }
+
+    if (depths.empty())
+    {
+        std::cerr << "No valid 3D points found for normalization." << std::endl;
+        return -1.0; // Indicate an error with a special value
+    }
+
+    // Sort depths to find the median
+    std::sort(depths.begin(), depths.end());
+    double medianDepth = depths[depths.size() / 2];
+
+    return medianDepth;
+}
+
+
+double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds) {
+    // Step 1: Compute the Median Depth of the Triangulated Points
+    double medianDepth = FindMedianDepth(point3Ds);
+    double invMedianDepth = 1.0 / medianDepth;
+
+    // Step 2: Normalize the 3D Points
+    for (auto& point : point3Ds)
+    {
+        point.x *= invMedianDepth;
+        point.y *= invMedianDepth;
+        point.z *= invMedianDepth;
+    }
+
+    return invMedianDepth;
 }
 
 
@@ -230,8 +284,50 @@ std::vector<cv::Point3d> MyTriangulatePoints(
     return points3D;
 }
 
-int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask)
+// Function to compute optical flow and track keypoints
+std::vector<cv::Point2f> TrackKeypointsOpticalFlow(const cv::Mat& prevImg, const cv::Mat& currImg, const std::vector<cv::Point2f>& currKeypoints, std::vector<bool>& mask) {
+    mask.resize(currKeypoints.size(), false);
+    std::vector<cv::Point2f> prevKeypoints;  // Will hold the keypoints in the previous image
+    std::vector<uchar> status;  // Status vector to check if keypoints were successfully tracked
+    std::vector<float> err;  // Error vector
+
+    // Calculate optical flow from the current image to the previous image
+    cv::calcOpticalFlowPyrLK(currImg, prevImg, currKeypoints, prevKeypoints, status, err);
+
+    // Update mask based on the criteria
+    for (size_t i = 0; i < status.size(); ++i) {
+        if (status[i]) {
+            // Calculate the displacement vector
+            cv::Point2f displacement = prevKeypoints[i] - currKeypoints[i];
+            float distance = cv::norm(displacement);
+
+            // Calculate the angle of the displacement in degrees
+            float angle = std::atan2(displacement.y, displacement.x) * 180.0 / CV_PI;
+
+            // Normalize the angle to the range [-180, 180]
+            if (angle > 180.0f) angle -= 360.0f;
+            if (angle < -180.0f) angle += 360.0f;
+
+            // Check if the angle is within the ±15 degrees in the x-direction
+            bool withinAngleThreshold = (std::abs(angle) <= 15.0f);
+
+            // Check if the distance is within the threshold
+            bool withinDistanceThreshold = (distance <= 30.0f);
+
+            // Update mask if both criteria are met
+            mask[i] = !withinAngleThreshold && withinDistanceThreshold;
+        }
+        else {
+            mask[i] = false; // Mark as false if tracking failed
+        }
+    }
+
+    return prevKeypoints;
+}
+
+int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask)
 {
+    const std::vector<std::shared_ptr<MapPoint>>& mapPoints = previousFrame->GetMapPoints();
     mask.resize(currentFrame->KeyPoints().size(), false);
     cv::Matx33d K = intrinsicCameraMatrix;
     cv::Matx44d Tcw = currentFrame->Tcw(); // 4x4 transformation matrix
@@ -240,8 +336,8 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
     std::vector<cv::KeyPoint> currentFrameKps = currentFrame->KeyPoints();
     cv::Mat currentFrameDesc = currentFrame->Descriptors(); // Assuming Descriptors() returns a cv::Mat
 
-    int width = currentFrame->Width(); // Assuming you have a method to get frame width
-    int height = currentFrame->Height(); // Assuming you have a method to get frame height
+    int width = currentFrame->Width();
+    int height = currentFrame->Height();
 
     int outPointCnt = 0;
     int descriptorDistanceOutCnt = 0;
@@ -310,7 +406,7 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
         if (bestDescriptorDistance < ORB_HARMING_DISTANCE_THRESHOLD)
         {
             currentFrame->GetMapPoints()[bestIndex] = mp_ptr; // Store map point in current frame
-            mp_ptr->AddObservation(currentFrame); // Add observer
+            //mp_ptr->AddObservation(currentFrame, bestIndex); // Add observer
             mask[bestIndex] = true; //mark that this index of keypoint has an associated map point
             trackedPtsCnt++;
         }
@@ -324,4 +420,9 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::
     //std::cout << "[Cpp] search by projection " << mapPoints.size() << " descriptorDistanceOutCnt " << descriptorDistanceOutCnt << std::endl;
 
     return trackedPtsCnt;
+}
+
+int SearchWithOpticalFlow(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, cv::Mat currentImage, cv::Mat previousImage)
+{
+
 }

@@ -20,12 +20,16 @@ public:
     void SetCameraInfo(float fx, float fy, float cx, float cy);
     void GetCurrentFramePose(cv::Mat* pose);
     void Track();
+    void GetMapPoints(std::vector<cv::Point3f>* mapPoints);
 
 private:
     void initialization();
     void updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints);
+    void updateMap(std::shared_ptr<Frame> currentKeyFrame);
     void trackWithMotionModel();
+    void createMapPoints(std::vector<bool> mask);
     std::vector<cv::Point2f> trackKeypointsOpticalFlow(const cv::Mat& prevImg, const cv::Mat& currImg, const std::vector<cv::Point2f>& currKeypoints, std::vector<bool>& mask);
+    bool isKeyFrame(int trackPointCnt);
 
     std::mutex _image_mutex;
     mutable std::mutex _frame_mutex;
@@ -41,6 +45,7 @@ private:
     std::shared_ptr<Frame> _previousFrame;
 
     std::set<std::shared_ptr<MapPoint>> _map;
+    std::set<std::shared_ptr<MapPoint>> _localMap;
 
     std::vector<std::shared_ptr<Frame>> _keyFrames;
 

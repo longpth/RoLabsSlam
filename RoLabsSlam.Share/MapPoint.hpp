@@ -9,12 +9,7 @@ class Frame;
 class MapPoint
 {
 public:
-    MapPoint() {
-        // Constructor implementation (if needed)
-    }
-
-    // Constructors
-    MapPoint(const cv::Point3d& position);
+    MapPoint();
 
     // Getters
     cv::Point3d GetPosition() const;
@@ -22,10 +17,10 @@ public:
     void SetPosition(const cv::Point3d& position);
 
     // Add an observation
-    void AddObservation(std::shared_ptr<Frame> frame);
+    void AddObservation(std::shared_ptr<Frame> frame, int keyPointIdex);
 
     // Get Observations
-    std::map<uint64_t, std::shared_ptr<Frame>> GetObservations();
+    std::map<std::shared_ptr<Frame>, uint64_t> GetObservations();
 
     // Remove an observation
     void RemoveObservation(Frame* frame);
@@ -35,10 +30,18 @@ public:
 
     void SetDescriptor(cv::Mat descriptor);
 
+    uint64_t Id()
+    {
+        return _id;
+    }
+
 private:
     cv::Point3d _position;                                       // 3D position of the map point
-    std::map<uint64_t, std::shared_ptr<Frame>> _observers;       // Frames associated with this map point
+    std::map<std::shared_ptr<Frame>, uint64_t> _observers;       // Frames associated with this map point
 
     cv::Mat _descriptor;
+
+    uint64_t _id;
+    static uint64_t mapPointCount;
 };
 

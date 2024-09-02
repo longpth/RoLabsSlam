@@ -461,11 +461,11 @@ void main()
                     var cameraXDirection = Vector3.Normalize(Vector3.Cross(_cameraUp, cameraZDirection));
                     var cameraYDirection = Vector3.Cross(cameraZDirection, cameraXDirection);
 
-                    _cameraPosition += cameraXDirection * delta.X * 0.1f;
-                    _cameraPosition += cameraYDirection * delta.Y * 0.1f;
+                    _cameraPosition -= cameraXDirection * delta.X * 0.1f;
+                    _cameraPosition -= cameraYDirection * delta.Y * 0.1f;
 
-                    _camTarget += cameraXDirection * delta.X * 0.1f;
-                    _camTarget += cameraYDirection * delta.Y * 0.1f;
+                    _camTarget -= cameraXDirection * delta.X * 0.1f;
+                    _camTarget -= cameraYDirection * delta.Y * 0.1f;
                 }
             }
 
@@ -478,11 +478,14 @@ void main()
 
         private void glControl_MouseWheel(object? sender, MouseEventArgs e)
         {
-            // Zoom in or out by adjusting the camera position along the direction vector
-            Vector3 direction = Vector3.Normalize(_mapOrigin - _cameraPosition);
-            _cameraPosition += direction * (e.Delta * 0.01f);
+            var cameraZDirection = Vector3.Normalize(_cameraPosition - _camTarget);
+            // Calculate the direction vector from the camera to the map origin
+            var cameraXDirection = Vector3.Normalize(Vector3.Cross(_cameraUp, cameraZDirection));
+            var cameraYDirection = Vector3.Cross(cameraZDirection, cameraXDirection);
 
-            _zoomFactor += e.Delta * 0.01f;
+            _cameraPosition -= cameraZDirection * e.Delta * 0.1f;
+
+            _camTarget -= cameraZDirection * e.Delta * 0.1f;
 
             // Trigger a repaint to update the view
             _glControl.Invalidate();

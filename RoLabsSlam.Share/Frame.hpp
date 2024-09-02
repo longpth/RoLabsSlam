@@ -93,6 +93,20 @@ public:
         return _height;
     }
 
+    void UpdateLocalKeyFrames();
+
+    std::vector<std::shared_ptr<Frame>>& GetLocalKeyFrames()
+    {
+        return _localKeyFrames;
+    }
+
+    std::vector<std::shared_ptr<Frame>>& GetFixedFrames()
+    {
+        return _fixedKeyFrames;
+    }
+
+    void RemoveMapPoint(MapPoint* mapPoint);
+
 private:
     void detectAndCompute(const cv::Mat& image);
     void detectAndCompute2(const cv::Mat& image);
@@ -114,4 +128,7 @@ private:
 
     uint64_t _id;
     static uint64_t frameCount;
+
+    std::vector<std::shared_ptr<Frame>> _localKeyFrames;
+    std::vector<std::shared_ptr<Frame>> _fixedKeyFrames;
 };

@@ -2,8 +2,12 @@
 #include "Frame.hpp"
 #include "Helpers.hpp"
 
-MapPoint::MapPoint(const cv::Point3d& position)
-    : _position(position) {}
+uint64_t MapPoint::mapPointCount = 0;
+
+MapPoint::MapPoint()
+{
+    _id = mapPointCount++;
+}
 
 // Setters
 void MapPoint::SetPosition(const cv::Point3d& position)
@@ -18,15 +22,21 @@ cv::Point3d MapPoint::GetPosition() const
 }
 
 // Add an observation
-void MapPoint::AddObservation(std::shared_ptr<Frame> frame)
+void MapPoint::AddObservation(std::shared_ptr<Frame> frame, int keyPointIdex)
 {
-    _observers[frame->Id()] = frame;
+    _observers[frame] = keyPointIdex;
 }
 
 // Remove an observation
 void MapPoint::RemoveObservation(Frame* frame)
 {
-    _observers.erase(frame->Id());
+    for (auto it = _observers.begin(); it != _observers.end(); ++it) {
+        if (it->first->Id() == frame->Id()) {
+            //std::cout << "[Cpp] remove observer frame id = " << frame->Id() << " from map point " << this->Id() << "\n";
+            _observers.erase(it);
+            break;
+        }
+    }
 }
 
 cv::Mat MapPoint::GetDescriptor()
@@ -39,7 +49,7 @@ void MapPoint::SetDescriptor(cv::Mat descriptor)
     _descriptor = descriptor.clone();
 }
 
-std::map<uint64_t, std::shared_ptr<Frame>> MapPoint::GetObservations()
+std::map<std::shared_ptr<Frame>, uint64_t> MapPoint::GetObservations()
 {
     return _observers;
 }

@@ -54,9 +54,10 @@ CVAPI(void) Slam_track(Slam* slam)
     }
 }
 
-CVAPI(void) Slam_getMapPoints(Slam* slam, std::vector<cv::Point3d>* mapPoint)
+CVAPI(void) Slam_getMapPoints(Slam* slam, std::vector<cv::Point3f>* mapPoint)
 {
     if (slam)
     {
+        slam->GetMapPoints(mapPoint);
     }
 }

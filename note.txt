@@ -1,0 +1,21 @@
+From ChatGPT:
+
+The normalization process you're applying in the context of SLAM (Simultaneous Localization and Mapping), specifically after triangulating 3D points, serves several important purposes:
+
+1. Resolve Scale Ambiguity:
+Monocular SLAM: In monocular SLAM, the scale of the 3D reconstruction is inherently ambiguous. This means that without additional information (like depth from a stereo camera or known physical measurements), the SLAM system cannot determine the absolute scale of the scene. The scene could be scaled up or down arbitrarily, and the system wouldn't know the difference.
+Normalization: By normalizing the 3D points such that the median depth is set to 1, the SLAM system establishes a consistent and controlled scale across the map. This ensures that the scale is not arbitrary and that different parts of the map and the camera poses are consistent with each other.
+2. Consistency in Geometry:
+Geometric Relationships: The positions of 3D points and the relative pose of the camera are tightly coupled. If the 3D points are scaled, the camera translation vector must also be scaled by the same factor to maintain the correct relative geometry. This normalization ensures that the geometric relationships between the camera and the points remain consistent.
+Error Minimization: A consistent scale helps in minimizing errors during subsequent steps like re-projection, loop closure, and bundle adjustment, where maintaining a consistent scale is crucial for accuracy.
+3. Robust Initialization:
+Initialization Stability: During the initialization phase of SLAM, especially in monocular SLAM, ensuring a stable and consistent scale early on is critical. If the scale is inconsistent or arbitrary, it can lead to poor tracking, incorrect map building, and ultimately, the failure of the SLAM system.
+Robustness to Outliers: By using the median depth (a robust statistic) rather than the mean or another measure, the system is less sensitive to outliers (e.g., incorrectly triangulated points with extreme depth values). This leads to a more stable and reliable initialization.
+4. Prevent Scale Drift:
+Scale Drift: Over time, in systems like SLAM, there's a risk that the scale of the map can drift, leading to inconsistencies where different parts of the map are at different scales. This drift can cause significant issues when merging maps, performing loop closures, or optimizing the global map.
+Normalization: By normalizing the scale early on and maintaining it consistently, the system reduces the risk of scale drift. This ensures that the entire map remains consistent in scale, leading to more reliable and accurate mapping and localization.
+5. Standardization for Optimization:
+Bundle Adjustment: During bundle adjustment (a key optimization step in SLAM), having a normalized and consistent scale helps the optimizer converge more effectively. If the scale were arbitrary or inconsistent, the optimization process could struggle to find a good solution, leading to suboptimal results.
+Loop Closure and Map Merging: When closing loops or merging maps from different sessions, having a consistent scale across all parts of the map ensures that these processes can be performed accurately and without introducing large errors.
+Summary:
+The purpose of this normalization process is to establish a consistent, controlled scale for the 3D map and the camera poses in monocular SLAM. This is crucial for maintaining the accuracy and reliability of the SLAM system, preventing issues like scale drift, and ensuring that the geometric relationships between the camera and the map points are preserved throughout the mapping and localization process.

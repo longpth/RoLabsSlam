@@ -162,7 +162,7 @@ void Slam::initialization()
     _keyFrames.push_back(_previousFrame);
     _keyFrames.push_back(_currentFrame);
 
-    Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
+    //Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
 
     // Mark initialization as done
     _initializationDone = true;
@@ -174,7 +174,10 @@ void Slam::trackWithMotionModel()
     // Step 2: Because we have the current camera pose, so we can do the projection search from 3d map points to match the 3d map points with the current frame keypoints
     // Step 3: Do the pose optimization using g2o with the map points and current frame keypoints
     // Step 4: calculate the camera velocity: velocity = currentPose * previousPose_invert
-    // Step 5: Create new 3d points from the current frame keypoint which are not in matched by the above projection search
+    // step 5: Check if the current frame is keyframe or not, to add it to the keyframe vector
+    // Step 6: Create new 3d points from the current frame keypoint which are not in matched by the above projection search by using OpticalFlow to find the 2d point in previous frame then do the triangulation
+    // Step 7: Do bundle adjustment for the keyframe vector
+
 
     // initialize map points vector with the size of keypoints, but currently the map points are nulls
     _currentFrame->InitializeMapPoints();
@@ -185,8 +188,44 @@ void Slam::trackWithMotionModel()
     _currentFrame->SetTcw(_velocity * _previousFrame->Tcw());
 
     std::vector<bool> mask;
+
+    int trackedPtsCnt = SearchByProjection(_currentFrame, _previousFrame, _intrinsicCameraMatrix, 15, mask);
+
+    STOP_MEASURE_TIME("MatchKeyPoints")
+
+    std::cout << "[Cpp] Track point count = " << trackedPtsCnt << std::endl;
+
+    if (isKeyFrame(trackedPtsCnt)) {
+        createMapPoints(mask);
+
+        updateMap(_currentFrame);
+
+        _currentFrame->UpdateLocalKeyFrames();
+
+        //Optimizer::BundleAdjustment(_currentFrame,_cameraInfo);
+
+        _keyFrames.push_back(_currentFrame);
+
+        std::cout << "[Cpp] Added key frame ************** " << _currentFrame->Id() << std::endl;
+    }
+    else
+    {
+        START_MEASURE_TIME("PoseOptimization")
+        // do the pose optimization to get the correct transformation from the world coordinate system to the current camera coordinate system
+        Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
+        STOP_MEASURE_TIME("PoseOptimization")
+    }
+
+    // calculate the motion velocity
+    _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+}
+
+#define DEBUG 1
+
+void Slam::createMapPoints(std::vector<bool> mask)
+{
     std::vector<cv::Point2f> notYetMachedPoints;
-    int trackedPtsCnt = SearchByProjection(_currentFrame, _map, _intrinsicCameraMatrix, 15, mask);
+
     for (int i = 0; i < mask.size(); i++)
     {
         if (!mask[i])
@@ -200,23 +239,44 @@ void Slam::trackWithMotionModel()
     std::vector<cv::Point2f> notYetMachedPointsFilter; // the notYetMachedPoints which have the previous points calculated by opticalflow
     std::vector<cv::Point2f> previousFramePointsFilter; // the notYetMachedPoints which have the previous points calculated by opticalflow
 
-    //Merge `mask` and `mask1`
-    size_t j = 0;
-    for (size_t i = 0; i < mask.size(); ++i)
+    for (size_t i = 0; i < mask1.size(); ++i)
     {
-        if (!mask[i])  // Check for points that were not matched in the first pass
-        {
-            // Update the mask with the combined result of mask1
-            mask[i] = mask1[j];
-            if (mask1[j]) {
-                notYetMachedPointsFilter.push_back(notYetMachedPoints[j]);
-                previousFramePointsFilter.push_back(previousFramePoints[j]);
-            }
-            ++j;
+        if (mask1[i]) {
+            notYetMachedPointsFilter.push_back(notYetMachedPoints[i]);
+            previousFramePointsFilter.push_back(previousFramePoints[i]);
         }
     }
 
-#if 1
+    std::cout << "[Cpp] Number of good points from optical flow = " << notYetMachedPointsFilter.size() << " " << previousFramePointsFilter.size() << std::endl;
+    std::cout << "[Cpp] Percentage of good points from optical flow = " << ((float)notYetMachedPointsFilter.size() / (float)notYetMachedPoints.size()) << std::endl;
+
+    // Estimate the Essential Matrix, previous to current frame
+    cv::Mat essential_matrix = cv::findEssentialMat(previousFramePointsFilter, notYetMachedPointsFilter, _intrinsicCameraMatrix, cv::RANSAC, 0.999, 1.0);
+    std::cout << "[Cpp] Essential Matrix = " << essential_matrix << std::endl;
+
+    // Recover pose
+    cv::Mat R, t, mask2;
+    int inliersCount = cv::recoverPose(essential_matrix, previousFramePointsFilter, notYetMachedPointsFilter, _intrinsicCameraMatrix, R, t, mask2); // five-point.cpp opencv
+
+    // Filter inliers and prepare for triangulation
+    std::vector<cv::Point2f> currentPoints, previousPoints;
+
+    int j = 0;
+    for (size_t i = 0; i < mask1.size(); ++i)
+    {
+        if (mask1[i]) {
+            mask1[i] = bool(mask2.at<uchar>(j));
+            if (mask2.at<uchar>(j))
+            {
+                // Keep the inliers
+                currentPoints.push_back(notYetMachedPointsFilter[j]);
+                previousPoints.push_back(previousFramePointsFilter[j]);
+            }
+            j++;
+        }
+    }
+
+#if DEBUG
     // Make a copy of the current image to draw on
     cv::Mat debugImage = _currentImage.clone();
 
@@ -236,102 +296,88 @@ void Slam::trackWithMotionModel()
 
 #endif
 
-    STOP_MEASURE_TIME("MatchKeyPoints")
-
-    std::cout << "[Cpp] Track point count = " << trackedPtsCnt << std::endl;
-
-    START_MEASURE_TIME("PoseOptimization")
-    // do the pose optimization to get the correct transformation from the world coordinate system to the current camera coordinate system
-    Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
-    STOP_MEASURE_TIME("PoseOptimization")
-
-    // Extract the 3x4 projection matrix from the 4x4 transformation matrix Tcw
-    cv::Mat Tcw0 = _previousFrame->Tcw();
-    cv::Mat Tcw1 = _currentFrame->Tcw();
-
-    //std::cout << "[Cpp] previous tranform " << Tcw0 << std::endl;
-    //std::cout << "[Cpp] current tranform " << Tcw1 << std::endl;
-    std::cout << "[Cpp] input for MyTriangulatePoints size " << previousFramePointsFilter.size() << " " << notYetMachedPointsFilter.size() << std::endl;
+    std::cout << "[Cpp] input for MyTriangulatePoints size " << previousPoints.size() << " " << currentPoints.size() << std::endl;
 
     // Create 3x4 matrices by selecting the first three rows of Tcw (ignoring the last row)
-    cv::Mat P0 = _intrinsicCameraMatrix * Tcw0(cv::Rect(0, 0, 4, 3));
-    cv::Mat P1 = _intrinsicCameraMatrix * Tcw1(cv::Rect(0, 0, 4, 3));
+    cv::Mat P0 = _intrinsicCameraMatrix * cv::Mat::eye(3, 4, CV_64F); // [I | 0]
+    cv::Mat P1(3, 4, CV_64F);
+    R.copyTo(P1(cv::Rect(0, 0, 3, 3))); // Copy R into the first 3x3 part of P1
+    t.copyTo(P1(cv::Rect(3, 0, 1, 3))); // Copy t into the last column of P1
+    P1 = _intrinsicCameraMatrix * P1;
 
     // Triangulate notYetMachedPoints in current frame
     // Projection matrices for the two views
-    std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P0, P1, previousFramePointsFilter, notYetMachedPointsFilter);
+    std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P0, P1, previousPoints, currentPoints);
 
-    // calculate the motion velocity
-    _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+    double invMedianDepth = Normalize3DPoints(p3ds);
+
+    t *= invMedianDepth;
+
+    cv::Mat relTransformation = CreateTransformationMatrix(R, t);
+    cv::Mat preTcw = _previousFrame->Tcw();
+
+    cv::Mat curTcw = relTransformation * preTcw;
+
+    _currentFrame->SetTcw(curTcw);
+
+    std::cout << "[Cpp] invMedianDepth " << invMedianDepth << "\n";
+    std::cout << "[Cpp] relative transformation " << relTransformation << "\n";
+    std::cout << "[Cpp] current Tcw reconstructed by OpticalFlow " << curTcw << "\n";
+    std::cout << "[Cpp] mask size = " << mask.size() << "\n";
+    std::cout << "[Cpp] mask1 size = " << mask1.size() << "\n";
+    std::cout << "[Cpp] _currentFrame->KeyPoints().size() = " << _currentFrame->KeyPoints().size() << "\n";
 
     // Create new 3d points from the current frame keypoint which are not in matched by the above projection search
     size_t k = 0;
+    size_t kk = 0;
     int newPoint = 0;
     for (int i = 0; i < _currentFrame->KeyPoints().size(); i++)
     {
         auto mp = _currentFrame->GetMapPoints()[i];
-        if (!mp && mask[i]) // not yet and map point, and it is a valid tracked point
+        if (!mask[i]) // not yet and map point, and it is a valid tracked point
         {
-            if (p3ds[k].z < 0) // point is behind the camera
-                continue;
+            if (mask1[k])
+            {
+                if (p3ds[kk].z > 0)
+                {
+                    // Convert the 3D point to homogeneous coordinates (4x1 vector)
+                    cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[kk].x, p3ds[kk].y, p3ds[kk].z, 1.0);
 
-            //std::cout << "[Cpp] New Map Point at index " << i << std::endl;
+                    // Transform the point from camera coordinates to world coordinates using Tcw
+                    cv::Mat pointWorldHomogeneous = _currentFrame->Tcw().inv() * pointCameraHomogeneous;
 
-            newPoint++;
-            _currentFrame->GetMapPoints()[i] = std::make_shared<MapPoint>();
-            _currentFrame->GetMapPoints()[i]->SetPosition(p3ds[k]);
-            _currentFrame->GetMapPoints()[i]->SetDescriptor(_currentFrame->Descriptors().row(i));
-            _currentFrame->GetMapPoints()[i]->AddObservation(_currentFrame);
+                    // Convert back to a 3D point in world coordinates
+                    cv::Point3d pointWorld(
+                        pointWorldHomogeneous.at<double>(0) / pointWorldHomogeneous.at<double>(3),
+                        pointWorldHomogeneous.at<double>(1) / pointWorldHomogeneous.at<double>(3),
+                        pointWorldHomogeneous.at<double>(2) / pointWorldHomogeneous.at<double>(3)
+                    );
+
+                    newPoint++;
+                    _currentFrame->GetMapPoints()[i] = std::make_shared<MapPoint>();
+                    _currentFrame->GetMapPoints()[i]->SetPosition(pointWorld);
+                    _currentFrame->GetMapPoints()[i]->SetDescriptor(_currentFrame->Descriptors().row(i));
+                }
+                kk++;
+            }
+            k++;
         }
-        else if(mp)
+#if DEBUG
+        else if (mp)
         {
             // For DEBUG
             cv::circle(debugImage, _currentFrame->KeyPoints()[i].pt, 3, cv::Scalar(255, 0, 0), -1);
         }
+#endif
     }
 
     std::cout << "[Cpp] New 3d points " << newPoint << std::endl;
 
-    updateMap(_currentFrame->GetMapPoints());
-
-    // so far, I add all the frames
-    //_keyFrames.push_back(_currentFrame);
-
-    // TODO: Do Bundle Adjustment here if the keyframe count >= 5
-
+#if DEBUG
     // For DEBUG
     cv::imshow("Optical Flow", debugImage);
     cv::waitKey(1);  // Wait for a key press to close the window
-
-}
-
-void Slam::SetCameraInfo(float fx, float fy, float cx, float cy)
-{
-    _cameraInfo.fx = fx;
-    _cameraInfo.fy = fy;
-    _cameraInfo.cx = cx;
-    _cameraInfo.cy = cy;
-
-    // Camera intrinsic parameters (assuming fx, fy, cx, cy are known and properly initialized)
-    _intrinsicCameraMatrix = (cv::Mat_<double>(3, 3) << _cameraInfo.fx, 0, _cameraInfo.cx, 0, _cameraInfo.fy, _cameraInfo.cy, 0, 0, 1);
-}
-
-void Slam::GetCurrentFramePose(cv::Mat *pose)
-{
-    if (_currentFrame) {
-        //std::cout << "[Cpp] get current transformation = " << _currentFrame->Tcw() << std::endl;
-        _currentFrame->Tcw().copyTo(*pose);
-    }
-}
-
-void Slam::updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints) {
-    for (const std::shared_ptr<MapPoint>& mapPoint : mapPoints) {
-        if (mapPoint) {
-            // Insert the shared pointer into the set
-            _map.insert(mapPoint);
-        }
-    }
-    std::cout << "[Cpp] map size after updated " << _map.size() << std::endl;
+#endif
 }
 
 // Function to compute optical flow and track keypoints
@@ -375,3 +421,113 @@ std::vector<cv::Point2f> Slam::trackKeypointsOpticalFlow(const cv::Mat& prevImg,
     return prevKeypoints;
 }
 
+bool Slam::isKeyFrame(int numTrackPpoints) {
+    double translationThreshold = 0.5;
+    double rotationThreshold = 0.087;   // 5 degrees in radians
+    int trackedPointsThreshold = 80;    // Require at least 80 tracked points
+    double parallaxThreshold = 1.0;     // 1 degree of parallax
+
+    // Check number of tracked points
+    if (numTrackPpoints < trackedPointsThreshold) return true;
+
+    // Check translation criterion
+    double translationDistance = cv::norm(_currentFrame->Tcw().col(3).rowRange(0, 3) - _keyFrames.back()->Tcw().col(3).rowRange(0, 3));
+    if (translationDistance > translationThreshold) return true;
+
+    cv::Mat currentRotation = _currentFrame->Tcw()(cv::Rect(0, 0, 3, 3));  // Extract the top-left 3x3 part
+    cv::Mat lastKeyframeRotation = _keyFrames.back()->Tcw()(cv::Rect(0, 0, 3, 3));  // Extract the top-left 3x3 part
+
+    // Compute the relative rotation matrix
+    cv::Mat rotationDifference = currentRotation * lastKeyframeRotation.inv();
+
+    // Calculate the rotation angle
+    double angle = acos((cv::trace(rotationDifference)[0] - 1.0) / 2.0);  // Angle in radians
+
+    // Check rotation criterion
+    if (angle > rotationThreshold) return true;
+
+    //// Check parallax criterion
+    //double averageParallax = ComputeAverageParallax(_currentFrame, _keyFrames.back());
+    //if (averageParallax > parallaxThreshold) return true;
+
+    // Otherwise, do not consider this frame as a keyframe
+    return false;
+}
+
+void Slam::SetCameraInfo(float fx, float fy, float cx, float cy)
+{
+    _cameraInfo.fx = fx;
+    _cameraInfo.fy = fy;
+    _cameraInfo.cx = cx;
+    _cameraInfo.cy = cy;
+
+    // Camera intrinsic parameters (assuming fx, fy, cx, cy are known and properly initialized)
+    _intrinsicCameraMatrix = (cv::Mat_<double>(3, 3) << _cameraInfo.fx, 0, _cameraInfo.cx, 0, _cameraInfo.fy, _cameraInfo.cy, 0, 0, 1);
+}
+
+void Slam::GetCurrentFramePose(cv::Mat *pose)
+{
+    if (_currentFrame) {
+        //std::cout << "[Cpp] get current transformation = " << _currentFrame->Tcw() << std::endl;
+        _currentFrame->Tcw().copyTo(*pose);
+    }
+}
+
+void Slam::updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints) {
+    for (const std::shared_ptr<MapPoint>& mapPoint : mapPoints) {
+        if (mapPoint) {
+            // Insert the shared pointer into the set
+            _map.insert(mapPoint);
+        }
+    }
+    std::cout << "[Cpp] map size after updated " << _map.size() << std::endl;
+}
+
+void Slam::updateMap(std::shared_ptr<Frame> currentKeyFrame) {
+    int i = 0;
+
+    std::vector<std::shared_ptr<Frame>>& localKeyFrames = _keyFrames.back()->GetLocalKeyFrames();
+
+    for (const std::shared_ptr<MapPoint>& mapPoint : currentKeyFrame->GetMapPoints()) {
+        if (mapPoint) {
+
+            bool isMapPointExisted = false;
+
+            for (auto localKeyFrame : localKeyFrames)
+            {
+                for (auto mp : localKeyFrame->GetMapPoints())
+                {
+                    if (mp) {
+                        double distance = std::sqrt(
+                            (mp->GetPosition().x - mapPoint->GetPosition().x) * (mp->GetPosition().x - mapPoint->GetPosition().x) +
+                            (mp->GetPosition().y - mapPoint->GetPosition().y) * (mp->GetPosition().y - mapPoint->GetPosition().y) +
+                            (mp->GetPosition().z - mapPoint->GetPosition().z) * (mp->GetPosition().z - mapPoint->GetPosition().z)
+                        );
+                        if (distance < 0.01)
+                        {
+                            isMapPointExisted = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!isMapPointExisted) {
+                mapPoint->AddObservation(currentKeyFrame, i);
+                // Insert the shared pointer into the set
+                _map.insert(mapPoint);
+            }
+        }
+        i++;
+    }
+    std::cout << "[Cpp] ************** map size after updated " << _map.size() << std::endl;
+}
+
+void Slam::GetMapPoints(std::vector<cv::Point3f>* mapPoints)
+{
+    for (const auto mp : _map)
+    {
+        cv::Point3f pt((float)mp->GetPosition().x, (float)mp->GetPosition().y, (float)mp->GetPosition().z);
+        mapPoints->push_back(pt);
+    }
+}

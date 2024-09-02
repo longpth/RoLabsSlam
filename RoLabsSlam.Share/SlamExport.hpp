@@ -20,4 +20,4 @@ CVAPI(void) Slam_start(Slam* slam);
 CVAPI(void) Slam_setIntrinsicsMatrix(Slam* slam, float fx, float fy, float cx, float cy);
 CVAPI(void) Slam_getCurrentPose(Slam* slam, cv::Mat* pose);
 CVAPI(void) Slam_track(Slam* slam);
-CVAPI(void) Slam_getMapPoints(Slam* slam, std::vector<cv::Point3d>* mapPoint);
+CVAPI(void) Slam_getMapPoints(Slam* slam, std::vector<cv::Point3f>* mapPoints);

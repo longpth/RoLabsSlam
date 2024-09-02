@@ -56,6 +56,9 @@ namespace RoLabsSlamSharp
         [DllImport(DllExtern, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         private static extern void Slam_track(IntPtr slam);
 
+        [DllImport(DllExtern, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        private static extern void Slam_getMapPoints(IntPtr slam, IntPtr mapPoints);
+
 
         // Constructor - Create Slam object
         public RolabsSlamSharpWrapper()
@@ -125,6 +128,17 @@ namespace RoLabsSlamSharp
             Slam_getCurrentPose(_slamPtr, pose.CvPtr);
 
             return pose;
+        }
+
+        public Point3f[] GetMapPoints()
+        {
+            if (_slamPtr == IntPtr.Zero)
+                throw new ObjectDisposedException("Slam");
+            using var mapPoints = new VectorOfPoint3f();
+
+            Slam_getMapPoints(_slamPtr, mapPoints.CvPtr);
+
+            return mapPoints.ToArray();
         }
 
         // Stop the Slam process

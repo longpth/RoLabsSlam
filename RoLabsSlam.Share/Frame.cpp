@@ -65,7 +65,7 @@ void Frame::detectAndCompute(const cv::Mat& image) {
 void Frame::detectAndCompute2(const cv::Mat& image) {
 
     // Parameters for goodFeaturesToTrack
-    int maxCorners = 1000; // Maximum number of good features to retain per cell
+    int maxCorners = 2000; // Maximum number of good features to retain per cell
     double qualityLevel = 0.01; // Quality level for good features
     double minDistance = 10.0; // Minimum distance between corners
     int blockSize = 3; // Block size for corner detection
@@ -87,4 +87,48 @@ void Frame::detectAndCompute2(const cv::Mat& image) {
     // Set the class member variables to the merged results
     _keypoints = goodKeypoints;
     _descriptors = goodFeaturesDescriptors;
+}
+
+void Frame::UpdateLocalKeyFrames()
+{
+    std::map<std::shared_ptr<Frame>, uint64_t> keyFrames; // map<Frame*, count>
+
+    for (const auto mp : _mapPoints)
+    {
+        if (!mp)
+            continue;
+        for (const auto& pair : mp->GetObservations()) {
+            if (pair.second != -1) // valid observation
+            {
+                keyFrames[pair.first]++;
+            }
+        }
+    }
+
+    for (const auto& pair : keyFrames)
+    {
+        if (pair.second > 20) // if the key frame has more than 20 points observed by this frame, add it to local key frames, else add it as fixed frames, used for bundle adjustment
+        {
+            _localKeyFrames.push_back(pair.first);
+        }
+        else
+        {
+            _fixedKeyFrames.push_back(pair.first);
+        }
+    }
+
+}
+
+void Frame::RemoveMapPoint(MapPoint* mapPoint)
+{
+    // Use std::find_if to search for the MapPoint with the specific ID
+    auto it = std::find_if(_mapPoints.begin(), _mapPoints.end(),
+        [mapPoint](const std::shared_ptr<MapPoint>& mp) {
+            return (mp && mp->Id() == mapPoint->Id());
+        });
+
+    if (it != _mapPoints.end()) {
+        *it = nullptr;
+        //std::cout << "[Cpp] Remove map point id = " << mapPoint->Id() << " from frame " << this->Id() << std::endl;
+    }
 }

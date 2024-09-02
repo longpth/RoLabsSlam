@@ -8,6 +8,29 @@
 #include "g2o/types/types_seven_dof_expmap.h"
 #include "Eigen/StdVector"
 
+cv::Mat g2oToCvMat(const g2o::SE3Quat& SE3quat) {
+    // Extract the rotation matrix (3x3) from the SE3Quat
+    Eigen::Matrix3d rotationMatrix = SE3quat.rotation().toRotationMatrix();
+
+    // Extract the translation vector (3x1) from the SE3Quat
+    Eigen::Vector3d translationVector = SE3quat.translation();
+
+    // Convert the Eigen matrix and vector to OpenCV Mat
+    cv::Mat R = (cv::Mat_<double>(3, 3) <<
+        rotationMatrix(0, 0), rotationMatrix(0, 1), rotationMatrix(0, 2),
+        rotationMatrix(1, 0), rotationMatrix(1, 1), rotationMatrix(1, 2),
+        rotationMatrix(2, 0), rotationMatrix(2, 1), rotationMatrix(2, 2));
+
+    cv::Mat t = (cv::Mat_<double>(3, 1) <<
+        translationVector(0), translationVector(1), translationVector(2));
+
+    // Combine R and t into a 4x4 transformation matrix
+    cv::Mat Tcw = cv::Mat::eye(4, 4, CV_64F);  // Initialize as an identity matrix
+    R.copyTo(Tcw(cv::Rect(0, 0, 3, 3)));       // Copy R into the top-left 3x3 part
+    t.copyTo(Tcw(cv::Rect(3, 0, 1, 3)));       // Copy t into the top-right 3x1 part
+
+    return Tcw;
+}
 
 // This function I refered from ORB-SLAM2 
 int Optimizer::PoseOptimization(std::shared_ptr<Frame> frame, const CameraInfo& camInfo)
@@ -149,4 +172,217 @@ int Optimizer::PoseOptimization(std::shared_ptr<Frame> frame, const CameraInfo& 
     frame->SetTcw(optimizedPoseCV);
 
     return nInitialCorrespondences - nBad;
+}
+
+void Optimizer::BundleAdjustment(std::shared_ptr<Frame> keyFrame, const CameraInfo& camInfo)
+{
+
+    // Get Local Key Frame
+    std::vector<std::shared_ptr<Frame>> localKeyFrames = keyFrame->GetLocalKeyFrames();
+
+    // Get Local Map
+    std::vector<std::shared_ptr<MapPoint>> localMapPoints;
+    for (auto mp : keyFrame->GetMapPoints())
+    {
+        if (mp) {
+            localMapPoints.push_back(mp);
+        }
+    }
+
+    // Get Fixed Frame
+    std::vector<std::shared_ptr<Frame>> fixedKeyFrames = keyFrame->GetFixedFrames();
+
+    std::cout << "[Cpp] BundleAdjustment localKeyFrames " << localKeyFrames.size() << " "
+              << "fixedKeyFrames " << fixedKeyFrames.size() << " "
+              << "localMapPoints " << localMapPoints.size() << std::endl;
+
+    // Setup optimizer
+    g2o::SparseOptimizer optimizer;
+    g2o::BlockSolver_6_3::LinearSolverType* linearSolver;
+
+    linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
+
+    g2o::BlockSolver_6_3* solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    optimizer.setAlgorithm(solver);
+
+    unsigned long maxKFid = 0;
+
+    // Set Local KeyFrame vertices
+    for (std::vector<std::shared_ptr<Frame>>::iterator lit = localKeyFrames.begin(), lend = localKeyFrames.end(); lit != lend; lit++)
+    {
+        Frame* pKFi = lit->get();
+        g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
+        cv::Mat Tcw = pKFi->Tcw();
+        Eigen::Matrix<double, 3, 3> R;
+        R << Tcw.at<double>(0, 0), Tcw.at<double>(0, 1), Tcw.at<double>(0, 2),
+            Tcw.at<double>(1, 0), Tcw.at<double>(1, 1), Tcw.at<double>(1, 2),
+            Tcw.at<double>(2, 0), Tcw.at<double>(2, 1), Tcw.at<double>(2, 2);
+        Eigen::Matrix<double, 3, 1> t(Tcw.at<double>(0, 3), Tcw.at<double>(1, 3), Tcw.at<double>(2, 3));
+        vSE3->setEstimate(g2o::SE3Quat(R,t));
+        vSE3->setId(pKFi->Id());
+        vSE3->setFixed(pKFi->Id() == 0);
+        optimizer.addVertex(vSE3);
+        if (pKFi->Id() > maxKFid)
+            maxKFid = pKFi->Id();
+    }
+
+    // Set Fixed KeyFrame vertices
+    for (std::vector<std::shared_ptr<Frame>>::iterator lit = fixedKeyFrames.begin(), lend = fixedKeyFrames.end(); lit != lend; lit++)
+    {
+        Frame* pKFi = lit->get();
+        g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
+        cv::Mat Tcw = pKFi->Tcw();
+        Eigen::Matrix<double, 3, 3> R;
+        R << Tcw.at<double>(0, 0), Tcw.at<double>(0, 1), Tcw.at<double>(0, 2),
+            Tcw.at<double>(1, 0), Tcw.at<double>(1, 1), Tcw.at<double>(1, 2),
+            Tcw.at<double>(2, 0), Tcw.at<double>(2, 1), Tcw.at<double>(2, 2);
+        Eigen::Matrix<double, 3, 1> t(Tcw.at<double>(0, 3), Tcw.at<double>(1, 3), Tcw.at<double>(2, 3));
+        vSE3->setEstimate(g2o::SE3Quat(R, t));
+        vSE3->setId(pKFi->Id());
+        vSE3->setFixed(true);
+        optimizer.addVertex(vSE3);
+        if (pKFi->Id() > maxKFid)
+            maxKFid = pKFi->Id();
+    }
+
+    std::cout << "[Cpp] localMapPoints size " << localMapPoints.size() << std::endl;
+
+    // Set MapPoint vertices
+    const int nExpectedSize = (localKeyFrames.size() + fixedKeyFrames.size())* localMapPoints.size();
+
+    std::vector<g2o::EdgeSE3ProjectXYZ*> vpEdgesMono;
+    vpEdgesMono.reserve(nExpectedSize);
+
+    std::vector<Frame*> vpEdgeKFMono;
+    vpEdgeKFMono.reserve(nExpectedSize);
+
+    std::vector<MapPoint*> vpMapPointEdgeMono;
+    vpMapPointEdgeMono.reserve(nExpectedSize);
+
+    int edgeCount = 0;
+
+    for (std::vector<std::shared_ptr<MapPoint>>::iterator lit = localMapPoints.begin(), lend = localMapPoints.end(); lit != lend; lit++)
+    {
+        MapPoint* pMP = lit->get();
+        g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
+        Eigen::Vector3d pointEstimate(pMP->GetPosition().x, pMP->GetPosition().y, pMP->GetPosition().z);
+        vPoint->setEstimate(pointEstimate);
+        int id = pMP->Id() + maxKFid + 1;
+        vPoint->setId(id);
+        vPoint->setMarginalized(true);
+        optimizer.addVertex(vPoint);
+
+        const std::map<std::shared_ptr<Frame>, uint64_t> observations = pMP->GetObservations();
+        const float thHuberMono = sqrt(5.991);
+
+        // Set edges
+        for (std::map<std::shared_ptr<Frame>, uint64_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+        {
+            if (mit->second != -1) {
+                //std::cout << "[Cpp] Edge count " << edgeCount << std::endl;
+                edgeCount++;
+                Frame* pKFi = mit->first.get();
+
+                const cv::KeyPoint& kp = pKFi->KeyPoints()[mit->second];
+
+                Eigen::Matrix<double, 2, 1> obs;
+                obs << kp.pt.x, kp.pt.y;
+
+                g2o::EdgeSE3ProjectXYZ* e = new g2o::EdgeSE3ProjectXYZ();
+
+                e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
+                e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->Id())));
+                e->setMeasurement(obs);
+                e->setInformation(Eigen::Matrix2d::Identity());
+
+                g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+                e->setRobustKernel(rk);
+                rk->setDelta(thHuberMono);
+
+                e->fx = camInfo.fx;
+                e->fy = camInfo.fy;
+                e->cx = camInfo.cx;
+                e->cy = camInfo.cy;
+
+                optimizer.addEdge(e);
+                vpEdgesMono.push_back(e);
+                vpEdgeKFMono.push_back(pKFi);
+                vpMapPointEdgeMono.push_back(pMP);
+            }
+        }
+    }
+
+    optimizer.initializeOptimization();
+    optimizer.optimize(5);
+
+    // Check inlier observations
+    for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++)
+    {
+        g2o::EdgeSE3ProjectXYZ* e = vpEdgesMono[i];
+
+        // this edge might be an outlier, so set level to 1 to exclude from from the main optimization process (level 0)
+        if (e->chi2() > 5.991 || !e->isDepthPositive())
+        {
+            e->setLevel(1);
+        }
+
+        e->setRobustKernel(0);
+    }
+
+    // Optimize again without the outliers
+
+    optimizer.initializeOptimization(0);
+    optimizer.optimize(10);
+
+    std::vector<std::pair<Frame*, MapPoint*>> outliers;
+
+    // Check inlier observations
+    for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++)
+    {
+        g2o::EdgeSE3ProjectXYZ* e = vpEdgesMono[i];
+        MapPoint* pMP = vpMapPointEdgeMono[i];
+
+        // Prepare outliers for removing
+        if (e->chi2() > 5.991 || !e->isDepthPositive())
+        {
+            Frame* pKFi = vpEdgeKFMono[i];
+            outliers.push_back(make_pair(pKFi, pMP));
+        }
+    }
+
+    // Remove outlier
+    for (int i = 0; i < outliers.size(); i++)
+    {
+        MapPoint* mp = outliers[i].second;
+        Frame* kframe = outliers[i].first;
+
+        //std::cout << "[Cpp] Remove map point outlier " << mp->Id() << std::endl;
+        //std::cout << "[Cpp] Remove key frame outlier " << kframe->Id() << std::endl;
+
+        kframe->RemoveMapPoint(mp);
+        mp->RemoveObservation(kframe);
+    }
+
+    // Recover optimized data
+
+    // Keyframes
+    for (std::vector<std::shared_ptr<Frame>>::iterator lit = localKeyFrames.begin(), lend = localKeyFrames.end(); lit != lend; lit++)
+    {
+        Frame* pKF = lit->get();
+        g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->Id()));
+        g2o::SE3Quat SE3quat = vSE3->estimate();
+
+        pKF->SetTcw(g2oToCvMat(SE3quat));
+    }
+
+    // Points
+    for (std::vector<std::shared_ptr<MapPoint>>::iterator lit = localMapPoints.begin(), lend = localMapPoints.end(); lit != lend; lit++)
+    {
+        MapPoint* pMP = lit->get();
+        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->Id() + maxKFid + 1));
+        Eigen::Vector3d position = vPoint->estimate();
+        pMP->SetPosition(cv::Point3d(position[0], position[1], position[2]));
+    }
 }

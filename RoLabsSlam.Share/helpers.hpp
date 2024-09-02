@@ -26,6 +26,9 @@ extern std::vector<cv::Point3d> MyTriangulatePoints(
     const std::vector<cv::Point2f>& points1,
     const std::vector<cv::Point2f>& points2);
 
-extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& mapPoints, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
+extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
 
-extern int HammingDistance(int a, int b);
+extern double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds);
+
+extern double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw = cv::Mat::eye(4, 4, CV_64F));
+
