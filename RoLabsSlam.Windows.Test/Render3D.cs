@@ -29,12 +29,18 @@ namespace RoLabsSlam.Windows.Test
 
         private int AxisShader;
         private int PyramidShader;
+        private int PointsShader;
 
         private int PyramidVAO;
         private int AxisVAO;
+        private int PointsVAO;
+
         private int EBO;
         private int PositionBuffer;
         private int ColorBuffer;
+        private int PointsPositionBuffer;
+        private int PointsColorBuffer;
+
         private float _angle = 0.0f;
         Matrix4 _projection;
 
@@ -47,6 +53,8 @@ namespace RoLabsSlam.Windows.Test
         private float _zoomFactor = 1;
 
         private List<Matrix4> _pyramidTransformations = new List<Matrix4>();
+        private List<Vector3> _points = new List<Vector3>();
+        private List<Color4> _pointsColors = new List<Color4>();
 
         Vector3 _pyramidTranslation = new Vector3(0.0f, 0.0f, 0.0f);
         Vector3 _pyramidRotation = new Vector3(0.0f, 0.0f, 0.0f);
@@ -160,6 +168,7 @@ void main()
 
             setupPyramid();
             setupAxis();
+            setupPoints();
         }
 
         public void AddPyramidTransformation(Matrix4 tranformation)
@@ -171,53 +180,12 @@ void main()
             _glControl.Invalidate();
         }
 
-        // Method to update the camera position based on direction
-        public void UpdateCameraPosition(float delta, CameraDirection direction)
+        public void AddPoints(IEnumerable<Vector3> points, IEnumerable<Color4> colors)
         {
-            // Calculate the direction vector from the camera to the map origin
-            var cameraZDirection = Vector3.Normalize(_cameraPosition - _camTarget);
-            var cameraXDirection = Vector3.Normalize(Vector3.Cross(_cameraUp, cameraZDirection));
-            var cameraYDirection = Vector3.Cross(cameraZDirection, cameraXDirection);
-
-            switch (direction)
-            {
-                case CameraDirection.Forward:
-                    // Move forward toward the target
-                    _cameraPosition -= cameraZDirection * delta;
-                    break;
-
-                case CameraDirection.Backward:
-                    // Move backward away from the target
-                    _cameraPosition += cameraZDirection * delta;
-                    break;
-
-                case CameraDirection.Left:
-                    // Move left relative to the direction to the target 
-                    _camTarget -= cameraXDirection * delta;
-                    _cameraPosition -= cameraXDirection * delta;
-                    break;
-
-                case CameraDirection.Right:
-                    // Move right relative to the direction to the target
-                    _camTarget += cameraXDirection * delta;
-                    _cameraPosition += cameraXDirection * delta;
-                    break;
-
-                case CameraDirection.Up:
-                    // Move up relative to the direction to the target 
-                    _camTarget -= cameraYDirection * delta;
-                    _cameraPosition -= cameraYDirection * delta;
-                    break;
-
-                case CameraDirection.Down:
-                    // Move down relative to the direction to the target 
-                    _camTarget += cameraYDirection * delta;
-                    _cameraPosition += cameraYDirection * delta;
-                    break;
-            }
-
-            // Trigger the scene to be redrawn with the new camera position
-            _glControl.Invalidate();
+            _points.AddRange(points);
+            _pointsColors.AddRange(colors);
+            setupPoints();  // Update the points buffers
+            _glControl.Invalidate();  // Repaint the scene
         }
         #endregion
 
@@ -265,6 +233,28 @@ void main()
             ColorBuffer = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ArrayBuffer, ColorBuffer);
             GL.BufferData(BufferTarget.ArrayBuffer, AxisColorData.Length * sizeof(float) * 4, AxisColorData, BufferUsageHint.StaticDraw);
+
+            GL.EnableVertexAttribArray(1);
+            GL.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, sizeof(float) * 4, 0);
+        }
+
+        private void setupPoints()
+        {
+            PointsShader = CompileProgram(VertexShaderSource, FragmentShaderSource);
+
+            PointsVAO = GL.GenVertexArray();
+            GL.BindVertexArray(PointsVAO);
+
+            PointsPositionBuffer = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ArrayBuffer, PointsPositionBuffer);
+            GL.BufferData(BufferTarget.ArrayBuffer, _points.Count * sizeof(float) * 3, _points.ToArray(), BufferUsageHint.StaticDraw);
+
+            GL.EnableVertexAttribArray(0);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, sizeof(float) * 3, 0);
+
+            PointsColorBuffer = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ArrayBuffer, PointsColorBuffer);
+            GL.BufferData(BufferTarget.ArrayBuffer, _pointsColors.Count * sizeof(float) * 4, _pointsColors.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.EnableVertexAttribArray(1);
             GL.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, sizeof(float) * 4, 0);
@@ -353,6 +343,16 @@ void main()
             GL.UniformMatrix4(GL.GetUniformLocation(AxisShader, "MVP"), true, ref axisMVP);
             GL.BindVertexArray(AxisVAO);
             GL.DrawArrays(PrimitiveType.Lines, 0, AxisVertexData.Length);
+
+            // Draw the 3D points
+            if (_points.Count > 0)
+            {
+                Matrix4 pointsMVP = viewMatrix * projectionMatrix;
+                GL.UseProgram(PointsShader);
+                GL.UniformMatrix4(GL.GetUniformLocation(PointsShader, "MVP"), true, ref pointsMVP);
+                GL.BindVertexArray(PointsVAO);
+                GL.DrawArrays(PrimitiveType.Points, 0, _points.Count);
+            }
 
             _glControl.SwapBuffers();
         }
@@ -456,7 +456,16 @@ void main()
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
-                    // TODO
+                    var cameraZDirection = Vector3.Normalize(_cameraPosition - _camTarget);
+                    // Calculate the direction vector from the camera to the map origin
+                    var cameraXDirection = Vector3.Normalize(Vector3.Cross(_cameraUp, cameraZDirection));
+                    var cameraYDirection = Vector3.Cross(cameraZDirection, cameraXDirection);
+
+                    _cameraPosition += cameraXDirection * delta.X * 0.1f;
+                    _cameraPosition += cameraYDirection * delta.Y * 0.1f;
+
+                    _camTarget += cameraXDirection * delta.X * 0.1f;
+                    _camTarget += cameraYDirection * delta.Y * 0.1f;
                 }
             }
 

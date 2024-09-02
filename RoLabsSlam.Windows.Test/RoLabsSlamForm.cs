@@ -23,6 +23,8 @@ namespace RoLabsSlam.Test
     }
     public partial class RoLabsSlamForm : Form
     {
+        private readonly float VisualizedScaled = 10.0f;
+
         private VideoCapture _videoCapture;
         private Mat _frame;
         private System.Windows.Forms.Timer _timer;
@@ -47,10 +49,6 @@ namespace RoLabsSlam.Test
         {
             InitializeComponent();
             InitializeVideoCapture();
-
-            this.KeyPreview = true;  // Enable KeyPreview to capture key events at the form level
-            this.KeyDown += new KeyEventHandler(RoLabsSlamForm_KeyDown);  // Attach the KeyDown event handler
-            this.MouseDown += RoLabsSlamForm_MouseDown;
         }
 
         private void glControl_Load(object? sender, EventArgs e)
@@ -114,7 +112,9 @@ namespace RoLabsSlam.Test
 
                     Matrix4 matrix4 = pose.ToMatrix4();
 
-                    Console.WriteLine($"Camera Pose {matrix4}");
+                    Console.WriteLine($"Camera Pose {matrix4} ================>  frame count: {_gtIndex}");
+
+                    Point3f[] mapPoints = _rolabsSlamWrapper.GetMapPoints();
 
                     Mat debugImg = _frame.Clone();
 
@@ -151,6 +151,18 @@ namespace RoLabsSlam.Test
                         pictureBoxProcess.Image = processBitmap;
                     }));
 
+                    // render camera poses
+                    matrix4.Invert();
+                    matrix4.M14 *= VisualizedScaled;
+                    matrix4.M24 *= VisualizedScaled;
+                    matrix4.M34 *= VisualizedScaled;
+                    matrix4.Transpose();
+                    _render3D.AddPyramidTransformation(matrix4);
+
+                    IEnumerable<Vector3> glPoints = mapPoints.Select(p => new Vector3(p.X* VisualizedScaled, p.Y* VisualizedScaled, p.Z* VisualizedScaled));
+                    Color4[] colors = Enumerable.Repeat(Color4.Green, mapPoints.Length).ToArray();
+                    _render3D.AddPoints(glPoints, colors);
+                    _gtIndex++;
                 }
                 else
                 {
@@ -208,12 +220,17 @@ namespace RoLabsSlam.Test
                     {
                         MessageBox.Show(ex.Message);
                     }
+
                 }
                 else
                 {
                     _rolabsSlamWrapper.SetCameraIntrinsics(camera_fx, camera_fy, camera_cx, camera_cy);
                     _rolabsSlamWrapper.Start();
                 }
+
+                radioGT.Enabled = false;
+                radioReal.Enabled = false;
+                textBoxGT.Enabled = false;
             }
             else if (_cameraState == CameraState.IsPaused)
             {
@@ -228,64 +245,14 @@ namespace RoLabsSlam.Test
             _videoCapture.Release();
             _timer.Stop();
             _rolabsSlamWrapper.Stop();
+            radioGT.Enabled = true;
+            radioReal.Enabled = true;
+            textBoxGT.Enabled = true;
         }
 
         private void pauseButton_Click(object sender, EventArgs e)
         {
             _cameraState = CameraState.IsPaused;
         }
-
-        private void RoLabsSlamForm_KeyDown(object sender, KeyEventArgs e)
-        {
-            // Handle key press without giving focus to the TextBox
-            if (e.KeyCode == Keys.Up || 
-                e.KeyCode == Keys.Down || 
-                e.KeyCode == Keys.Left || 
-                e.KeyCode == Keys.Right || 
-                e.KeyCode == Keys.PageUp || 
-                e.KeyCode == Keys.PageDown)
-            {
-                // Prevent the TextBox from getting focus by handling the keys
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-
-                // Call your camera update method
-                HandleCameraMovement(e.KeyCode);
-            }
-        }
-
-        private void HandleCameraMovement(Keys key)
-        {
-            float delta = 1.0f; // Your delta value
-
-            switch (key)
-            {
-                case Keys.Up:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Forward);
-                    break;
-                case Keys.Down:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Backward);
-                    break;
-                case Keys.Left:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Left);
-                    break;
-                case Keys.Right:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Right);
-                    break;
-                case Keys.PageUp:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Up);
-                    break;
-                case Keys.PageDown:
-                    _render3D.UpdateCameraPosition(delta, CameraDirection.Down);
-                    break;
-            }
-        }
-
-        private void RoLabsSlamForm_MouseDown(object sender, MouseEventArgs e)
-        {
-            // Set focus to the form itself or another control like a button
-            glControl.Focus();
-        }
-
     }
 }
