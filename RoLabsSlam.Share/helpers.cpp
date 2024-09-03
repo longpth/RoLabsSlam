@@ -116,14 +116,6 @@ void FindRtAndTriangulate(
     previousFrame->SetDescriptor(validPreviousDescriptorsFiltered);
     currentFrame->SetDescriptor(validCurrentDescriptorsFiltered);
 
-    // Update the outliers in the current frame
-    currentFrame->Outliers().clear(); // Clear previous outliers
-    for (size_t i = 0; i < validKeyPointCurrent.size(); ++i)
-    {
-        // Mark inliers as non-outliers (-1 or some similar value)
-        currentFrame->Outliers().push_back(false);
-    }
-
     cv::Mat transformation = CreateTransformationMatrix(R, t);
 
     // Update the current frame's transformation matrix (camera to world)
