@@ -23,7 +23,7 @@ namespace RoLabsSlam.Test
     }
     public partial class RoLabsSlamForm : Form
     {
-        private readonly float VisualizedScaled = 10.0f;
+        private readonly float VisualizedScaled = 20f;
 
         private VideoCapture _videoCapture;
         private Mat _frame;

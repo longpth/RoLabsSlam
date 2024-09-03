@@ -7,6 +7,7 @@ using OpenTK.WinForms;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.UI.Xaml.Media;
+using System.Diagnostics;
 
 namespace RoLabsSlam.Windows.Test
 {
@@ -45,10 +46,10 @@ namespace RoLabsSlam.Windows.Test
         Matrix4 _projection;
 
         private Vector2 _lastMousePosition;
-        private Vector3 _cameraPosition = new Vector3(30, 30, 0);  // Position the camera high up on the Y-axis
+        private Vector3 _cameraPosition = new Vector3(2.9950254f, -19.99997f, 0.17618717f);  // Position the camera high up on the Y-axis
         private Quaternion _cameraRotation = Quaternion.Identity;
         private Vector3 _mapOrigin = Vector3.Zero;  // Look at the origin
-        private Vector3 _camTarget = Vector3.Zero;  // Look at the origin
+        private Vector3 _camTarget = new Vector3(3, 0, 0);
         private Vector3 _cameraUp = Vector3.UnitY;  // Up direction is along the Z-axis, as Y is used for height
         private float _zoomFactor = 1;
 
@@ -169,6 +170,7 @@ void main()
             setupPyramid();
             setupAxis();
             setupPoints();
+
         }
 
         public void AddPyramidTransformation(Matrix4 tranformation)
@@ -264,13 +266,26 @@ void main()
         {
             _glControl.MakeCurrent();
 
+            // Prevent division by zero in case of a very small or zero height
             if (_glControl.ClientSize.Height == 0)
+            {
                 _glControl.ClientSize = new System.Drawing.Size(_glControl.ClientSize.Width, 1);
+            }
 
+            // Set the viewport to cover the entire window
             GL.Viewport(0, 0, _glControl.ClientSize.Width, _glControl.ClientSize.Height);
 
-            float aspect_ratio = Math.Max(_glControl.ClientSize.Width, 1) / (float)Math.Max(_glControl.ClientSize.Height, 1);
-            _projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, aspect_ratio, 1, 64);
+            // Calculate the aspect ratio of the window
+            float aspect_ratio = _glControl.ClientSize.Width / (float)_glControl.ClientSize.Height;
+
+            // Set up the projection matrix with a reasonable field of view and clipping planes
+            // Field of view is set to 60 degrees (you can adjust this), and near and far clipping planes are set to 0.1 and 1000 units, respectively
+            _projection = Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(60), // Field of view in radians
+                aspect_ratio,                    // Aspect ratio
+                0.1f,                            // Near clipping plane
+                1000f                            // Far clipping plane
+            );
         }
 
         private void glControl_Paint(object sender, PaintEventArgs e)
@@ -453,6 +468,8 @@ void main()
                     //Console.WriteLine(_cameraRotation);
 
                     _cameraPosition = Vector3.Transform(_cameraPosition - _mapOrigin, _cameraRotation) + _mapOrigin;
+
+                    Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
@@ -461,11 +478,13 @@ void main()
                     var cameraXDirection = Vector3.Normalize(Vector3.Cross(_cameraUp, cameraZDirection));
                     var cameraYDirection = Vector3.Cross(cameraZDirection, cameraXDirection);
 
-                    _cameraPosition -= cameraXDirection * delta.X * 0.1f;
-                    _cameraPosition -= cameraYDirection * delta.Y * 0.1f;
+                    _cameraPosition += cameraXDirection * delta.X * 0.1f;
+                    _cameraPosition += cameraYDirection * delta.Y * 0.1f;
 
-                    _camTarget -= cameraXDirection * delta.X * 0.1f;
-                    _camTarget -= cameraYDirection * delta.Y * 0.1f;
+                    _camTarget += cameraXDirection * delta.X * 0.1f;
+                    _camTarget += cameraYDirection * delta.Y * 0.1f;
+
+                    Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
                 }
             }
 
