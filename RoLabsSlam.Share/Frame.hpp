@@ -19,11 +19,20 @@ public:
 
     // Getter methods
     const cv::Mat& Descriptors() const { return _descriptors; }
-    const std::vector<cv::KeyPoint>& KeyPoints() const { return _keypoints; }
-    std::vector<cv::KeyPoint> KeyPoints() { return _keypoints; }
+
+    const std::vector<cv::KeyPoint>& KeyPoints() const {
+        std::unique_lock<std::mutex> lock(mtxKeyPoints);
+        return _keypoints; 
+    }
+
+    std::vector<cv::KeyPoint> KeyPoints() { 
+        std::unique_lock<std::mutex> lock(mtxKeyPoints);
+        return _keypoints; 
+    }
 
     void SetKeyPoints(std::vector<cv::KeyPoint> updatedKeyPoints)
     {
+        std::unique_lock<std::mutex> lock(mtxKeyPoints);
         _keypoints = updatedKeyPoints;
     }
 
@@ -43,6 +52,7 @@ public:
 
     // Set the transformation matrix Tcw
     void SetTcw(const cv::Mat& transformationMatrix) {
+        std::unique_lock<std::mutex> lock(mtxTcw);
         _Tcw = transformationMatrix.clone();
     }
 
@@ -55,11 +65,13 @@ public:
 
     std::shared_ptr<MapPoint> GetMapPoint(int index)
     {
+        std::unique_lock<std::mutex> lock(mtxMapPoints);
         return _mapPoints[index];
     }
 
     std::vector<std::shared_ptr<MapPoint>>& GetMapPoints()
     {
+        std::unique_lock<std::mutex> lock(mtxMapPoints);
         return _mapPoints;
     }
 
@@ -97,11 +109,13 @@ public:
 
     std::vector<std::shared_ptr<Frame>>& GetLocalKeyFrames()
     {
+        std::unique_lock<std::mutex> lock(mtxFrames);
         return _localKeyFrames;
     }
 
     std::vector<std::shared_ptr<Frame>>& GetFixedFrames()
     {
+        std::unique_lock<std::mutex> lock(mtxFrames);
         return _fixedKeyFrames;
     }
 
@@ -131,4 +145,9 @@ private:
 
     std::vector<std::shared_ptr<Frame>> _localKeyFrames;
     std::vector<std::shared_ptr<Frame>> _fixedKeyFrames;
+
+    std::mutex mtxFrames;
+    std::mutex mtxMapPoints;
+    mutable std::mutex mtxKeyPoints;
+    std::mutex mtxTcw;
 };

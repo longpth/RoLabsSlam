@@ -91,6 +91,8 @@ void Frame::detectAndCompute2(const cv::Mat& image) {
 
 void Frame::UpdateLocalKeyFrames()
 {
+    std::unique_lock<std::mutex> lock(mtxFrames); // Lock the mutex
+
     std::map<std::shared_ptr<Frame>, uint64_t> keyFrames; // map<Frame*, count>
 
     for (const auto mp : _mapPoints)
@@ -121,6 +123,7 @@ void Frame::UpdateLocalKeyFrames()
 
 void Frame::RemoveMapPoint(MapPoint* mapPoint)
 {
+    std::unique_lock<std::mutex> lock(mtxMapPoints);
     // Use std::find_if to search for the MapPoint with the specific ID
     auto it = std::find_if(_mapPoints.begin(), _mapPoints.end(),
         [mapPoint](const std::shared_ptr<MapPoint>& mp) {

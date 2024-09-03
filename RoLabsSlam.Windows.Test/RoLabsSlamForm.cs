@@ -159,9 +159,9 @@ namespace RoLabsSlam.Test
                     matrix4.Transpose();
                     _render3D.AddPyramidTransformation(matrix4);
 
-                    IEnumerable<Vector3> glPoints = mapPoints.Select(p => new Vector3(p.X* VisualizedScaled, p.Y* VisualizedScaled, p.Z* VisualizedScaled));
-                    Color4[] colors = Enumerable.Repeat(Color4.Green, mapPoints.Length).ToArray();
-                    _render3D.AddPoints(glPoints, colors);
+                    //IEnumerable<Vector3> glPoints = mapPoints.Select(p => new Vector3(p.X* VisualizedScaled, p.Y* VisualizedScaled, p.Z* VisualizedScaled));
+                    //Color4[] colors = Enumerable.Repeat(Color4.Green, mapPoints.Length).ToArray();
+                    //_render3D.AddPoints(glPoints, colors);
                     _gtIndex++;
                 }
                 else

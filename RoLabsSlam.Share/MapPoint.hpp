@@ -43,5 +43,9 @@ private:
 
     uint64_t _id;
     static uint64_t mapPointCount;
+
+    std::mutex mtxDescriptor;
+    std::mutex mtxObservation;
+    mutable std::mutex mtxPosition;
 };
 

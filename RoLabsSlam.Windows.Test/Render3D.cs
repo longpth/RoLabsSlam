@@ -469,7 +469,7 @@ void main()
 
                     _cameraPosition = Vector3.Transform(_cameraPosition - _mapOrigin, _cameraRotation) + _mapOrigin;
 
-                    Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
+                    //Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
@@ -484,7 +484,7 @@ void main()
                     _camTarget += cameraXDirection * delta.X * 0.1f;
                     _camTarget += cameraYDirection * delta.Y * 0.1f;
 
-                    Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
+                    //Console.WriteLine($"_cameraPosition {_cameraPosition} _camTarget {_camTarget}");
                 }
             }
 
