@@ -462,8 +462,8 @@ void main()
                 if (e.Button == MouseButtons.Left)
                 {
                     // Calculate the rotation quaternions based on mouse movement
-                    float yawAngle = delta.X * 0.1f;  // Adjust sensitivity as needed
-                    float pitchAngle = delta.Y * 0.1f; // Adjust sensitivity as needed
+                    float yawAngle = delta.X * 0.05f;  // Adjust sensitivity as needed
+                    float pitchAngle = delta.Y * 0.05f; // Adjust sensitivity as needed
 
                     // Create quaternions for yaw and pitch
                     Quaternion yawRotation = Quaternion.FromAxisAngle(_cameraUp, MathHelper.DegreesToRadians(yawAngle));

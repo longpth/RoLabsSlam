@@ -4,11 +4,6 @@
 
 const int ORB_HARMING_DISTANCE_THRESHOLD = 100;
 
-std::vector<cv::Point3d> MyTriangulatePoints(
-    const cv::Mat& P1, const cv::Mat& P2,
-    const std::vector<cv::Point2f>& points1,
-    const std::vector<cv::Point2f>& points2);
-
 // Function to decompose essential matrix and triangulate points
 void FindRtAndTriangulate(
     const cv::Mat& essential_matrix,
@@ -43,6 +38,8 @@ void FindRtAndTriangulate(
     // Recover pose
     int inliersCount = cv::recoverPose(essential_matrix, points2, points1, cameraMatrix, R, t, mask); // five-point.cpp opencv
 
+    std::cout << "[Cpp] Initialization R =" << R << " t = " << t << " inliersCount = " << inliersCount << " = " << (float) inliersCount / (float) points1.size() << "\n";
+
     // Filter inliers and prepare for triangulation
     inlierPreviousFrameKeypoints.clear();
     inlierCurrentFrameKeypoints.clear();
@@ -71,8 +68,10 @@ void FindRtAndTriangulate(
     t.copyTo(P1(cv::Rect(3, 0, 1, 3))); // Copy t into the last column of P1
     P1 = cameraMatrix * P1;
 
+    std::vector<bool > mask3d;
+    int goodParallaxCnt = 0;
     // Triangulate points
-    std::vector<cv::Point3d> point3Ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints);
+    std::vector<cv::Point3d> point3Ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints, mask3d, goodParallaxCnt);
 
     invMedianDepth = Normalize3DPoints(point3Ds);
 
@@ -290,7 +289,9 @@ cv::Mat EstimateEssentialMatrix(const Frame& frame1, const Frame& frame2, const 
 std::vector<cv::Point3d> MyTriangulatePoints(
     const cv::Mat& P1, const cv::Mat& P2,
     const std::vector<cv::Point2f>& points1,
-    const std::vector<cv::Point2f>& points2)
+    const std::vector<cv::Point2f>& points2,
+    std::vector<bool>& mask,
+    int& goodParralaxCnt)
 {
     assert(points1.size() == points2.size()); // size of poth point vectors must equal
 
@@ -315,7 +316,19 @@ std::vector<cv::Point3d> MyTriangulatePoints(
         // Convert homogeneous coordinates to 3D
         X /= X.at<double>(3);  // Normalize by W to get (X, Y, Z, 1)
 
+        cv::Point3d pt3d = cv::Point3d(X.at<double>(0), X.at<double>(1), X.at<double>(2));
+
         points3D.emplace_back(X.at<double>(0), X.at<double>(1), X.at<double>(2));
+
+        if (calculateCosParallax(P1, P2, pt3d) < 0.9998)
+        {
+            mask.push_back(true);
+            goodParralaxCnt++;
+        }
+        else
+        {
+            mask.push_back(false);
+        }
     }
 
     return points3D;
@@ -461,15 +474,15 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Fram
 
 float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, const cv::Mat& Tcw, const cv::Mat& cameraMatrix) {
     // Step 1: Convert 3D world point to homogeneous coordinates (4x1 matrix)
-    cv::Mat point3d_homogeneous = (cv::Mat_<float>(4, 1) << point3world.x, point3world.y, point3world.z, 1.0);
+    cv::Mat point3d_homogeneous = (cv::Mat_<double>(4, 1) << point3world.x, point3world.y, point3world.z, 1.0);
 
     // Step 2: Transform the 3D point from world coordinates to camera coordinates using Tcw
     cv::Mat point3d_camera = Tcw * point3d_homogeneous;
 
     // Step 3: Normalize the camera coordinates (i.e., divide by z to project to the image plane)
-    float X = point3d_camera.at<float>(0);
-    float Y = point3d_camera.at<float>(1);
-    float Z = point3d_camera.at<float>(2);
+    float X = point3d_camera.at<double>(0);
+    float Y = point3d_camera.at<double>(1);
+    float Z = point3d_camera.at<double>(2);
 
     if (Z <= 0) {
         std::cerr << "Point is behind the camera, cannot project!" << std::endl;
@@ -487,4 +500,25 @@ float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, c
     float reprojection_error = sqrt(pow(point2f.x - u_projected, 2) + pow(point2f.y - v_projected, 2));
 
     return reprojection_error;
+}
+
+// Function to calculate the parallax between two rays in two views
+double calculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D) {
+    // Extract camera centers from projection matrices P1 and P2
+    // The camera center is the null space of the projection matrix (P * C = 0)
+    cv::Mat C1 = -P1.colRange(0, 3).inv() * P1.col(3);
+    cv::Mat C2 = -P2.colRange(0, 3).inv() * P2.col(3);
+
+    // Create the ray vectors from the camera centers to the 3D point
+    cv::Mat ray1 = (cv::Mat_<double>(3, 1) << point3D.x - C1.at<double>(0), point3D.y - C1.at<double>(1), point3D.z - C1.at<double>(2));
+    cv::Mat ray2 = (cv::Mat_<double>(3, 1) << point3D.x - C2.at<double>(0), point3D.y - C2.at<double>(1), point3D.z - C2.at<double>(2));
+
+    // Normalize the rays (we only care about the direction)
+    ray1 /= cv::norm(ray1);
+    ray2 /= cv::norm(ray2);
+
+    // Calculate the dot product between the two rays
+    double cosTheta = ray1.dot(ray2);
+
+    return cosTheta;
 }

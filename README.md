@@ -64,3 +64,4 @@ OpenCVSharp for providing an easy way to integrate OpenCV with C#.</br>
 g2o and Eigen for their powerful optimization and mathematical tools.</br>
 OpenTK for simplifying 3D rendering in C#.</br>
 [ORB_SLAM2](https://github.com/raulmur/ORB_SLAM2) for indirect visual slam knowledge.</br>
+[twitchslam](https://github.com/geohot/twitchslam) for local map points culling .</br>

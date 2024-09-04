@@ -205,12 +205,16 @@ void Slam::trackWithMotionModel()
 
     bool newMapPointNeeded = needNewMapPoints(trackedPtsCnt);
 
+    _allFrames.push_back(_currentFrame);
+
+    bool createMapPointSuccess = true;
+
     if (newMapPointNeeded) {
         START_MEASURE_TIME("createMapPoints")
-        bool validMapPoints = createMapPoints(mask);
+        createMapPointSuccess = createMapPoints(mask);
         STOP_MEASURE_TIME("createMapPoints")
 
-        if (validMapPoints) {
+        if (createMapPointSuccess) {
             START_MEASURE_TIME("updateMap")
             updateMap(_currentFrame);
 
@@ -218,21 +222,24 @@ void Slam::trackWithMotionModel()
 
             STOP_MEASURE_TIME("updateMap")
 
-            std::cout << "[Cpp] Added key frame ************** " << _currentFrame->Id() << std::endl;
+            std::cout << "[Cpp] Created new map points for frame ************** " << _currentFrame->Id() << std::endl;
+
         }
     }
 
-    _allFrames.push_back(_currentFrame);
-
     START_MEASURE_TIME("BundleAdjustment2")
-    if (_allFrames.size() >= 5 && _currentFrame->Id() % 5 == 0 && !newMapPointNeeded) {
+    if (_allFrames.size() >= 10 && _allFrames.size() % 10 == 0 && trackedPtsCnt > 80) {
         // Do bundle adjustment
         Optimizer::BundleAdjustment2(_allFrames, _localMap, _cameraInfo);
     }
     STOP_MEASURE_TIME("BundleAdjustment2")
 
-    // calculate the motion velocity
-    _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+    if (createMapPointSuccess) {
+        // calculate the motion velocity
+        _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+    } else{
+        _velocity = cv::Mat::eye(4, 4, CV_64F); // 4x4 identity matrix
+    }
 }
 
 #define DEBUG 0
@@ -292,6 +299,13 @@ bool Slam::createMapPoints(std::vector<bool> mask)
     cv::Mat R, t, mask2;
     int inliersCount = cv::recoverPose(essential_matrix, previousFramePointsFilter, currentFramePointsFilter, _intrinsicCameraMatrix, R, t, mask2); // five-point.cpp opencv
 
+    float percentageInliers = (float)inliersCount / (float)currentFramePointsFilter.size();
+
+    if (percentageInliers < 0.1)
+    {
+        return false;
+    }
+
     if (percentage_tracked_optical >= 0.1)
     {
         // Filter inliers and prepare for triangulation
@@ -324,10 +338,13 @@ bool Slam::createMapPoints(std::vector<bool> mask)
         // Draw the optical flow vectors
         for (size_t i = 0; i < previousFramePointsFilter.size(); ++i) {
             // Draw a line from the previous point to the current point
-            cv::line(debugImage, previousFramePointsFilter[i], notYetMachedPointsFilter[i], cv::Scalar(0, 255, 0), 2);
+            cv::line(debugImage, previousFramePointsFilter[i], currentFramePointsFilter[i], cv::Scalar(0, 255, 0), 2);
 
             // Optionally, draw the points as well
-            cv::circle(debugImage, notYetMachedPointsFilter[i], 3, cv::Scalar(0, 0, 255), -1);
+            cv::circle(debugImage, currentFramePointsFilter[i], 3, cv::Scalar(0, 0, 255), -1);
+
+            cv::imshow("Optical Flow", debugImage);
+            cv::waitKey(1);  // Wait for a key press to close the window
         }
 
 #endif
@@ -341,7 +358,9 @@ bool Slam::createMapPoints(std::vector<bool> mask)
 
         // Triangulate currentFramePoints in current frame
         // Projection matrices for the two views
-        std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P0, P1, previousPoints, currentPoints);
+        std::vector<bool> mask3d;
+        int goodParallaxCnt = 0;
+        std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P0, P1, previousPoints, currentPoints, mask3d, goodParallaxCnt);
 
         Normalize3DPoints(p3ds, _invertmedianDepth);
 
@@ -367,7 +386,7 @@ bool Slam::createMapPoints(std::vector<bool> mask)
                 {
                     if (mask1[k])
                     {
-                        if (p3ds[kk].z > 0)
+                        if (p3ds[kk].z > 0 && mask3d[kk] == true)
                         {
                             // Convert the 3D point to homogeneous coordinates (4x1 vector)
                             cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[kk].x, p3ds[kk].y, p3ds[kk].z, 1.0);
@@ -391,12 +410,15 @@ bool Slam::createMapPoints(std::vector<bool> mask)
                     }
                     k++;
                 }
-#if DEBUG
+#if false
                 else if (mp)
                 {
                     // For DEBUG
                     cv::circle(debugImage, _currentFrame->KeyPoints()[i].pt, 3, cv::Scalar(255, 0, 0), -1);
                 }
+                // For DEBUG
+                cv::imshow("Optical Flow", debugImage);
+                cv::waitKey(1);  // Wait for a key press to close the window
 #endif
             }
             std::cout << "[Cpp] New 3d points " << newPoint << std::endl;
@@ -440,7 +462,9 @@ bool Slam::createMapPoints(std::vector<bool> mask)
         P1 = _intrinsicCameraMatrix * P1;
 
         // Triangulate points
-        std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints);
+        std::vector<bool> mask3d;
+        int goodParallaxCnt = 0;
+        std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints, mask3d, goodParallaxCnt);
 
         Normalize3DPoints(p3ds, _invertmedianDepth);
 
@@ -460,8 +484,8 @@ bool Slam::createMapPoints(std::vector<bool> mask)
 
             for (int i = 0; i < p3ds.size(); i++)
             {
-                if (p3ds[i].z < 0 || current_map_points[currentIndices[i]] != nullptr)
-                    continue; // Skip points with Z < 0 or the point already created by reprojection
+                if (p3ds[i].z < 0 || mask3d[i] == false || current_map_points[currentIndices[i]] != nullptr)
+                    continue; // Skip points with Z < 0 or the point already created by reprojection or less parralax
 
                 if (previous_map_points[previousIndices[i]]) // map point already associated with the keypoint in previous frame
                 {
@@ -509,12 +533,6 @@ bool Slam::createMapPoints(std::vector<bool> mask)
             ret = false;
         }
     }
-
-#if DEBUG
-    // For DEBUG
-    cv::imshow("Optical Flow", debugImage);
-    cv::waitKey(1);  // Wait for a key press to close the window
-#endif
 
     return ret;
 }

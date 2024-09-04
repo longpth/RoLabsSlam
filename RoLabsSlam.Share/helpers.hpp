@@ -25,7 +25,9 @@ extern cv::Mat EstimateEssentialMatrix(const Frame& frame1, const Frame& frame2,
 extern std::vector<cv::Point3d> MyTriangulatePoints(
     const cv::Mat& P1, const cv::Mat& P2,
     const std::vector<cv::Point2f>& points1,
-    const std::vector<cv::Point2f>& points2);
+    const std::vector<cv::Point2f>& points2,
+    std::vector<bool>& mask,
+    int& goodParralaxCnt);
 
 extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
 
@@ -38,3 +40,5 @@ extern void Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, double invMedi
 extern double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw = cv::Mat::eye(4, 4, CV_64F));
 
 extern float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, const cv::Mat& Tcw, const cv::Mat& cameraMatrix);
+
+extern double calculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D);

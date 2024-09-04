@@ -348,19 +348,19 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
 
     std::cout << "[Cpp] Bundle Adjustment >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n";
 
-    // Keyframes
+    // Frames update
     for (std::vector<std::shared_ptr<Frame>>::iterator lit = frames.begin() + firstLocalFrameId, lend = frames.begin() + lastLocalFrameId; lit != lend; lit++)
     {
         Frame* pKF = lit->get();
         g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->Id()));
         g2o::SE3Quat SE3quat = vSE3->estimate();
 
-        //std::cout << "[Cpp] Update " << pKF->Id() << g2oToCvMat(SE3quat) << "\n";
+        std::cout << "[Cpp] Update " << pKF->Id() << g2oToCvMat(SE3quat) << "\n";
 
         pKF->SetTcw(g2oToCvMat(SE3quat));
     }
 
-    // Points
+    // Points update
     for (std::set<std::shared_ptr<MapPoint>>::iterator lit = mapPoints.begin(), lend = mapPoints.end(); lit != lend; lit++)
     {
         std::shared_ptr<MapPoint> pMP = *lit;
@@ -388,9 +388,9 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
         }
 
         error /= frames.size();
-        bool oldPoint = frames.size() <= 3 && biggestId < frames.size() - 10;
+        bool oldPoint = frames.size() <= 3 && biggestId < frames.size() - 7;
 
-        if (oldPoint || error >= 0.02)
+        if (oldPoint || error >= 0.5)
         {
             old = true;
             mapPoints.erase(pMP);
