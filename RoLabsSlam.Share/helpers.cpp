@@ -15,7 +15,8 @@ void FindRtAndTriangulate(
     const cv::Mat& cameraMatrix,
     const std::vector<cv::DMatch>& good_matches,
     std::shared_ptr<Frame> currentFrame,
-    std::shared_ptr<Frame> previousFrame
+    std::shared_ptr<Frame> previousFrame,
+    double& invMedianDepth
 )
 {
     const std::vector<cv::KeyPoint>& previousFrameKeypoints = previousFrame->KeyPoints(); // Keypoints from previousFrame
@@ -73,7 +74,7 @@ void FindRtAndTriangulate(
     // Triangulate points
     std::vector<cv::Point3d> point3Ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints);
 
-    double invMedianDepth = Normalize3DPoints(point3Ds);
+    invMedianDepth = Normalize3DPoints(point3Ds);
 
     t *= invMedianDepth;
 
@@ -155,10 +156,52 @@ double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw)
     return medianDepth;
 }
 
+void Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, double invMedianDepth)
+{
+    for (auto& point : point3Ds)
+    {
+        point.x *= invMedianDepth;
+        point.y *= invMedianDepth;
+        point.z *= invMedianDepth;
+    }
+}
 
-double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds) {
+double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds)
+{
     // Step 1: Compute the Median Depth of the Triangulated Points
     double medianDepth = FindMedianDepth(point3Ds);
+    double invMedianDepth = 1.0 / medianDepth;
+    //double invMedianDepth = 1.0;
+
+    // Step 2: Normalize the 3D Points
+    for (auto& point : point3Ds)
+    {
+        point.x *= invMedianDepth;
+        point.y *= invMedianDepth;
+        point.z *= invMedianDepth;
+    }
+
+    std::cout << "[Cpp] medianDepth = " << medianDepth << "\n";
+
+    return invMedianDepth;
+}
+
+double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, std::vector<double>& medianDepthVector) {
+    // Step 1: Compute the Median Depth of the Triangulated Points
+    double medianDepth = FindMedianDepth(point3Ds);
+
+    if (medianDepth != -1) {
+
+        medianDepthVector.push_back(medianDepth);
+
+        medianDepth = 0;
+        for (auto med : medianDepthVector)
+        {
+            medianDepth += med;
+        }
+        medianDepth = medianDepth / medianDepthVector.size();
+    }
+
     double invMedianDepth = 1.0 / medianDepth;
 
     // Step 2: Normalize the 3D Points
@@ -168,6 +211,8 @@ double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds) {
         point.y *= invMedianDepth;
         point.z *= invMedianDepth;
     }
+
+    std::cout << "[Cpp] medianDepth = " << medianDepth << "\n";
 
     return invMedianDepth;
 }

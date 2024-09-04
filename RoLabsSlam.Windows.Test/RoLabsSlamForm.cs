@@ -14,6 +14,7 @@ using OpenTK.Mathematics;
 using OpenTK.WinForms;
 using RoLabsSlam.Windows.Test;
 using System.Diagnostics;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RoLabsSlam.Test
 {
@@ -23,7 +24,7 @@ namespace RoLabsSlam.Test
     }
     public partial class RoLabsSlamForm : Form
     {
-        private readonly float VisualizedScaled = 20f;
+        private readonly float VisualizedScaled = 20.0f;
 
         private VideoCapture _videoCapture;
         private Mat _frame;
@@ -33,6 +34,8 @@ namespace RoLabsSlam.Test
         private List<Mat> _gtTransformations;
         private int _gtIndex = 0;
         private readonly int CameraTimePerFrame = 100; //ms
+
+        bool _addPoints = false;
 
         //private float camera_fx = 458.654f, camera_fy = 457.296f, camera_cx = 367.215f, camera_cy = 248.375f; // euroC
 
@@ -107,7 +110,7 @@ namespace RoLabsSlam.Test
 
                     Console.WriteLine($"Tracking Time: {stopwatch.ElapsedMilliseconds} ms");
 
-                    (_keyPointsCurrent , _keyPointsPrevious) = _rolabsSlamWrapper.GetDebugKeyPoints();
+                    (_keyPointsCurrent, _keyPointsPrevious) = _rolabsSlamWrapper.GetDebugKeyPoints();
                     Mat pose = _rolabsSlamWrapper.GetPose();
 
                     Matrix4 matrix4 = pose.ToMatrix4();
@@ -126,8 +129,8 @@ namespace RoLabsSlam.Test
                             var previousPoint = _keyPointsPrevious[i];
 
                             // Draw an arrow between the matched keypoints
-                            Cv2.ArrowedLine(debugImg, new OpenCvSharp.Point((int)previousPoint.Pt.X, (int)previousPoint.Pt.Y), 
-                                                      new OpenCvSharp.Point((int)currentPoint.Pt.X, (int)currentPoint.Pt.Y), 
+                            Cv2.ArrowedLine(debugImg, new OpenCvSharp.Point((int)previousPoint.Pt.X, (int)previousPoint.Pt.Y),
+                                                      new OpenCvSharp.Point((int)currentPoint.Pt.X, (int)currentPoint.Pt.Y),
                                                       new Scalar(0, 255, 0), 2, LineTypes.AntiAlias, 0, 0.2);
                         }
                     }
@@ -159,9 +162,13 @@ namespace RoLabsSlam.Test
                     matrix4.Transpose();
                     _render3D.AddPyramidTransformation(matrix4);
 
-                    //IEnumerable<Vector3> glPoints = mapPoints.Select(p => new Vector3(p.X* VisualizedScaled, p.Y* VisualizedScaled, p.Z* VisualizedScaled));
-                    //Color4[] colors = Enumerable.Repeat(Color4.Green, mapPoints.Length).ToArray();
-                    //_render3D.AddPoints(glPoints, colors);
+                    if (_addPoints)
+                    {
+                        IEnumerable<Vector3> glPoints = mapPoints.Select(p => new Vector3(p.X * VisualizedScaled, p.Y * VisualizedScaled, p.Z * VisualizedScaled));
+                        Color4[] colors = Enumerable.Repeat(Color4.Green, mapPoints.Length).ToArray();
+                        _render3D.ClearPoints();
+                        _render3D.AddPoints(glPoints, colors);
+                    }
                     _gtIndex++;
                 }
                 else
@@ -169,6 +176,9 @@ namespace RoLabsSlam.Test
                     _timer.Stop();
                     _videoCapture.Release();
                 }
+
+                frameNo.Invoke(new Action(() => frameNo.Text = $"Frame No: {_gtIndex}"));
+
             }
             else
             {
@@ -197,6 +207,8 @@ namespace RoLabsSlam.Test
                 _render3D.AddPyramidTransformation(matrix4);
                 _gtIndex++;
             }
+
+            //_cameraState = CameraState.IsPaused;
         }
 
         private void startButton_Click(object sender, EventArgs e)
@@ -253,6 +265,25 @@ namespace RoLabsSlam.Test
         private void pauseButton_Click(object sender, EventArgs e)
         {
             _cameraState = CameraState.IsPaused;
+        }
+
+        private void checkBoxPointCloud_CheckedChanged(object sender, EventArgs e)
+        {
+            // Cast sender to CheckBox to access its properties
+            System.Windows.Forms.CheckBox checkBox = sender as System.Windows.Forms.CheckBox;
+
+            if (checkBox != null)
+            {
+                if (checkBox.Checked)
+                {
+                    _addPoints = true;
+                }
+                else
+                {
+                    _addPoints = false;
+                    _render3D.ClearPoints();
+                }
+            }
         }
     }
 }

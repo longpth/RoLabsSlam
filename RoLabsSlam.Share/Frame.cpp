@@ -109,7 +109,7 @@ void Frame::UpdateLocalKeyFrames()
 
     for (const auto& pair : keyFrames)
     {
-        if (pair.second > 20) // if the key frame has more than 20 points observed by this frame, add it to local key frames, else add it as fixed frames, used for bundle adjustment
+        if (pair.second > 80) // if the key frame has more than 20 points observed by this frame, add it to local key frames, else add it as fixed frames, used for bundle adjustment
         {
             _localKeyFrames.push_back(pair.first);
         }

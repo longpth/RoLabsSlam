@@ -3,6 +3,7 @@
 #include <opencv2/core.hpp>
 #include <map>
 #include <memory>
+#include "my_functions.h"
 
 class Frame;
 
@@ -20,7 +21,7 @@ public:
     void AddObservation(std::shared_ptr<Frame> frame, int keyPointIdex);
 
     // Get Observations
-    std::map<std::shared_ptr<Frame>, uint64_t> GetObservations();
+    std::map<std::shared_ptr<Frame>, uint64_t>& GetObservations();
 
     // Remove an observation
     void RemoveObservation(Frame* frame);

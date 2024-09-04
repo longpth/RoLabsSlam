@@ -29,7 +29,7 @@ private:
     void trackWithMotionModel();
     bool createMapPoints(std::vector<bool> mask);
     std::vector<cv::Point2f> trackKeypointsOpticalFlow(const cv::Mat& prevImg, const cv::Mat& currImg, const std::vector<cv::Point2f>& currKeypoints, std::vector<bool>& mask);
-    bool isKeyFrame(int trackPointCnt);
+    bool needNewMapPoints(int trackPointCnt);
     void trackWithPreviousKeyFrame();
 
     std::mutex _image_mutex;
@@ -48,11 +48,14 @@ private:
     std::set<std::shared_ptr<MapPoint>> _map;
     std::set<std::shared_ptr<MapPoint>> _localMap;
 
-    std::vector<std::shared_ptr<Frame>> _keyFrames;
+    std::vector<std::shared_ptr<Frame>> _allFrames;
 
     CameraInfo _cameraInfo;
 
     cv::Mat _intrinsicCameraMatrix;
 
     cv::Mat _velocity;
+
+    std::vector<double> _medianDepth;
+    double _invertmedianDepth;
 };

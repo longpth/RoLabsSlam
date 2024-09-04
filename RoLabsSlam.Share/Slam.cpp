@@ -156,11 +156,12 @@ void Slam::initialization()
         _intrinsicCameraMatrix,
         good_matches,
         _currentFrame,
-        _previousFrame
+        _previousFrame,
+        _invertmedianDepth
         );
 
-    _keyFrames.push_back(_previousFrame);
-    _keyFrames.push_back(_currentFrame);
+    _allFrames.push_back(_previousFrame);
+    _allFrames.push_back(_currentFrame);
 
     //Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
 
@@ -171,7 +172,7 @@ void Slam::initialization()
 void Slam::trackWithPreviousKeyFrame()
 {
     std::vector<bool> mask;
-    SearchByProjection(_currentFrame, _keyFrames.back(), _intrinsicCameraMatrix, 15, mask);
+    SearchByProjection(_currentFrame, _allFrames.back(), _intrinsicCameraMatrix, 15, mask);
     START_MEASURE_TIME("PoseOptimization")
         // do the pose optimization to get the correct transformation from the world coordinate system to the current camera coordinate system
         Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
@@ -212,20 +213,20 @@ void Slam::trackWithMotionModel()
 
     std::cout << "[Cpp] Track point count = " << trackedPtsCnt << std::endl;
 
-    if (isKeyFrame(trackedPtsCnt)) {
+    bool newMapPointNeeded = needNewMapPoints(trackedPtsCnt);
+
+    if (newMapPointNeeded) {
         START_MEASURE_TIME("createMapPoints")
-        bool validKeyFrame = createMapPoints(mask);
+        bool validMapPoints = createMapPoints(mask);
         STOP_MEASURE_TIME("createMapPoints")
 
-        if (validKeyFrame) {
+        if (validMapPoints) {
+            START_MEASURE_TIME("updateMap")
             updateMap(_currentFrame);
 
-            _currentFrame->UpdateLocalKeyFrames();
+            //_currentFrame->UpdateLocalKeyFrames();
 
-            //// Do bundle adjustment
-            //Optimizer::BundleAdjustment(_currentFrame, _cameraInfo);
-
-            _keyFrames.push_back(_currentFrame);
+            STOP_MEASURE_TIME("updateMap")
 
             std::cout << "[Cpp] Added key frame ************** " << _currentFrame->Id() << std::endl;
         }
@@ -234,6 +235,15 @@ void Slam::trackWithMotionModel()
             trackWithPreviousKeyFrame();
         }
     }
+
+    _allFrames.push_back(_currentFrame);
+
+    START_MEASURE_TIME("BundleAdjustment2")
+    if (_allFrames.size() >= 5 && _currentFrame->Id() % 5 == 0 && !newMapPointNeeded) {
+        // Do bundle adjustment
+        Optimizer::BundleAdjustment2(_allFrames, _localMap, _cameraInfo);
+    }
+    STOP_MEASURE_TIME("BundleAdjustment2")
 
     // calculate the motion velocity
     _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
@@ -347,11 +357,11 @@ bool Slam::createMapPoints(std::vector<bool> mask)
         // Projection matrices for the two views
         std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P0, P1, previousPoints, currentPoints);
 
-        double invMedianDepth = Normalize3DPoints(p3ds);
+        Normalize3DPoints(p3ds, _invertmedianDepth);
 
-        if (invMedianDepth != -1) {
+        if (p3ds.size() > 0) {
 
-            t *= invMedianDepth;
+            t *= _invertmedianDepth;
 
             cv::Mat relTransformation = CreateTransformationMatrix(R, t);
             cv::Mat preTcw = _previousFrame->Tcw();
@@ -446,11 +456,11 @@ bool Slam::createMapPoints(std::vector<bool> mask)
         // Triangulate points
         std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints);
 
-        double invMedianDepth = Normalize3DPoints(p3ds);
+        Normalize3DPoints(p3ds, _invertmedianDepth);
 
-        if (invMedianDepth != -1) {
+        if (p3ds.size() > 0) {
 
-            t *= invMedianDepth;
+            t *= _invertmedianDepth;
 
             cv::Mat relTransformation = CreateTransformationMatrix(R, t);
             cv::Mat preTcw = _previousFrame->Tcw();
@@ -469,8 +479,21 @@ bool Slam::createMapPoints(std::vector<bool> mask)
 
                 if (previous_map_points[previousIndices[i]]) // map point already associated with the keypoint in previous frame
                 {
-                    current_map_points[currentIndices[i]] = previous_map_points[previousIndices[i]];
-                    current_map_points[currentIndices[i]]->AddObservation(_currentFrame, currentIndices[i]);
+                    bool existedMapPoint = false;
+                    // check if this previous map point has already assigned for the current frame map or not
+                    for (auto mp : current_map_points)
+                    {
+                        if (mp && (mp->Id() == previous_map_points[previousIndices[i]]->Id()))
+                        {
+                            existedMapPoint = true;
+                            break;
+                        }
+                    }
+                    if (!existedMapPoint)
+                    {
+                        current_map_points[currentIndices[i]] = previous_map_points[previousIndices[i]];
+                        current_map_points[currentIndices[i]]->AddObservation(_currentFrame, currentIndices[i]);
+                    }
                 }
                 else
                 {
@@ -551,7 +574,7 @@ std::vector<cv::Point2f> Slam::trackKeypointsOpticalFlow(const cv::Mat& prevImg,
     return prevKeypoints;
 }
 
-bool Slam::isKeyFrame(int numTrackPpoints) {
+bool Slam::needNewMapPoints(int numTrackPpoints) {
     double translationThreshold = 0.5;
     double rotationThreshold = 0.087;   // 5 degrees in radians
     int trackedPointsThreshold = 80;    // Require at least 80 tracked points
@@ -561,11 +584,11 @@ bool Slam::isKeyFrame(int numTrackPpoints) {
     if (numTrackPpoints < trackedPointsThreshold) return true;
 
     // Check translation criterion
-    double translationDistance = cv::norm(_currentFrame->Tcw().col(3).rowRange(0, 3) - _keyFrames.back()->Tcw().col(3).rowRange(0, 3));
+    double translationDistance = cv::norm(_currentFrame->Tcw().col(3).rowRange(0, 3) - _allFrames.back()->Tcw().col(3).rowRange(0, 3));
     if (translationDistance > translationThreshold) return true;
 
     cv::Mat currentRotation = _currentFrame->Tcw()(cv::Rect(0, 0, 3, 3));  // Extract the top-left 3x3 part
-    cv::Mat lastKeyframeRotation = _keyFrames.back()->Tcw()(cv::Rect(0, 0, 3, 3));  // Extract the top-left 3x3 part
+    cv::Mat lastKeyframeRotation = _allFrames.back()->Tcw()(cv::Rect(0, 0, 3, 3));  // Extract the top-left 3x3 part
 
     // Compute the relative rotation matrix
     cv::Mat rotationDifference = currentRotation * lastKeyframeRotation.inv();
@@ -577,7 +600,7 @@ bool Slam::isKeyFrame(int numTrackPpoints) {
     if (angle > rotationThreshold) return true;
 
     //// Check parallax criterion
-    //double averageParallax = ComputeAverageParallax(_currentFrame, _keyFrames.back());
+    //double averageParallax = ComputeAverageParallax(_currentFrame, _allFrames.back());
     //if (averageParallax > parallaxThreshold) return true;
 
     // Otherwise, do not consider this frame as a keyframe
@@ -608,6 +631,7 @@ void Slam::updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints) {
         if (mapPoint) {
             // Insert the shared pointer into the set
             _map.insert(mapPoint);
+            _localMap.insert(mapPoint);
         }
     }
     std::cout << "[Cpp] map size after updated " << _map.size() << std::endl;
@@ -616,36 +640,16 @@ void Slam::updateMap(const std::vector<std::shared_ptr<MapPoint>>& mapPoints) {
 void Slam::updateMap(std::shared_ptr<Frame> currentKeyFrame) {
     int i = 0;
 
-    std::vector<std::shared_ptr<Frame>>& localKeyFrames = _keyFrames.back()->GetLocalKeyFrames();
-
     for (const std::shared_ptr<MapPoint>& mapPoint : currentKeyFrame->GetMapPoints()) {
         if (mapPoint) {
 
             bool isMapPointExisted = false;
 
-            for (auto localKeyFrame : localKeyFrames)
-            {
-                for (auto mp : localKeyFrame->GetMapPoints())
-                {
-                    if (mp) {
-                        double distance = std::sqrt(
-                            (mp->GetPosition().x - mapPoint->GetPosition().x) * (mp->GetPosition().x - mapPoint->GetPosition().x) +
-                            (mp->GetPosition().y - mapPoint->GetPosition().y) * (mp->GetPosition().y - mapPoint->GetPosition().y) +
-                            (mp->GetPosition().z - mapPoint->GetPosition().z) * (mp->GetPosition().z - mapPoint->GetPosition().z)
-                        );
-                        if (distance < 0.01)
-                        {
-                            isMapPointExisted = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
             if (!isMapPointExisted) {
                 mapPoint->AddObservation(currentKeyFrame, i);
                 // Insert the shared pointer into the set
                 _map.insert(mapPoint);
+                _localMap.insert(mapPoint);
             }
         }
         i++;

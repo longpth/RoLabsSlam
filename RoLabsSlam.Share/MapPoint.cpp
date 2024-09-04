@@ -55,7 +55,7 @@ void MapPoint::SetDescriptor(cv::Mat descriptor)
     _descriptor = descriptor.clone();
 }
 
-std::map<std::shared_ptr<Frame>, uint64_t> MapPoint::GetObservations()
+std::map<std::shared_ptr<Frame>, uint64_t>& MapPoint::GetObservations()
 {
     std::unique_lock lock(mtxObservation);
     return _observers;

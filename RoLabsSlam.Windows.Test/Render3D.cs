@@ -182,6 +182,14 @@ void main()
             _glControl.Invalidate();
         }
 
+        public void ClearPoints()
+        {
+            _points.Clear();
+            _pointsColors.Clear();
+            setupPoints();  // Update the points buffers
+            _glControl.Invalidate();  // Repaint the scene
+        }
+
         public void AddPoints(IEnumerable<Vector3> points, IEnumerable<Color4> colors)
         {
             _points.AddRange(points);

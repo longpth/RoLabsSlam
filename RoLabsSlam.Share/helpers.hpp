@@ -11,7 +11,8 @@ extern void FindRtAndTriangulate(
     const cv::Mat& cameraMatrix,
     const std::vector<cv::DMatch>& good_matches,
     std::shared_ptr<Frame> currentFrame,
-    std::shared_ptr<Frame> previousFrame
+    std::shared_ptr<Frame> previousFrame,
+    double& invMedianDepth
     );
 
 
@@ -29,6 +30,10 @@ extern std::vector<cv::Point3d> MyTriangulatePoints(
 extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
 
 extern double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds);
+
+extern double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, std::vector<double>& medianDepthVector);
+
+extern void Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, double invMedianDepth);
 
 extern double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw = cv::Mat::eye(4, 4, CV_64F));
 

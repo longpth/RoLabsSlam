@@ -17,6 +17,11 @@ public:
 
     Frame(const cv::Mat& image);
 
+    // overloading < operator 
+    bool operator<(const Frame& other) const {
+        return _id < other.Id();
+    }
+
     // Getter methods
     const cv::Mat& Descriptors() const { return _descriptors; }
 
@@ -80,7 +85,7 @@ public:
         return _outliers;
     }
 
-    uint64_t Id()
+    uint64_t Id() const
     {
         return _id;
     }
