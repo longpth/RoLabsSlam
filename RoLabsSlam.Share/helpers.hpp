@@ -37,3 +37,4 @@ extern void Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, double invMedi
 
 extern double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw = cv::Mat::eye(4, 4, CV_64F));
 
+extern float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, const cv::Mat& Tcw, const cv::Mat& cameraMatrix);

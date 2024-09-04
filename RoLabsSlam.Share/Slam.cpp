@@ -169,16 +169,6 @@ void Slam::initialization()
     _initializationDone = true;
 }
 
-void Slam::trackWithPreviousKeyFrame()
-{
-    std::vector<bool> mask;
-    SearchByProjection(_currentFrame, _allFrames.back(), _intrinsicCameraMatrix, 15, mask);
-    START_MEASURE_TIME("PoseOptimization")
-        // do the pose optimization to get the correct transformation from the world coordinate system to the current camera coordinate system
-        Optimizer::PoseOptimization(_currentFrame, _cameraInfo);
-    STOP_MEASURE_TIME("PoseOptimization")
-}
-
 void Slam::trackWithMotionModel()
 {
     // Step 1: Set the current camera pose by multiply the velocity and the previous camera pose
@@ -229,10 +219,6 @@ void Slam::trackWithMotionModel()
             STOP_MEASURE_TIME("updateMap")
 
             std::cout << "[Cpp] Added key frame ************** " << _currentFrame->Id() << std::endl;
-        }
-        else
-        {
-            trackWithPreviousKeyFrame();
         }
     }
 

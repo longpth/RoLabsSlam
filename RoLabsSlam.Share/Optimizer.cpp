@@ -7,6 +7,7 @@
 #include "g2o/solvers/linear_solver_dense.h"
 #include "g2o/types/types_seven_dof_expmap.h"
 #include "Eigen/StdVector"
+#include "Helpers.hpp"
 
 cv::Mat g2oToCvMat(const g2o::SE3Quat& SE3quat) {
     // Extract the rotation matrix (3x3) from the SE3Quat
@@ -373,12 +374,23 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
         std::map<std::shared_ptr<Frame>, uint64> frames = pMP->GetObservations();
 
         int biggestId = 0;
+        float error = 0;
 
         for (const auto& pair : frames) {
             biggestId = biggestId < pair.first->Id() ? pair.first->Id() : biggestId;
+            Frame* frame = pair.first.get();
+            cv::Point2f point2d = frame->KeyPoints()[pair.second].pt;
+            cv::Mat cameraMatrix = (cv::Mat_<float>(3, 3) <<
+                camInfo.fx, 0, camInfo.cx,  // fx, 0, cx
+                0, camInfo.fy, camInfo.cy,  // 0, fy, cy
+                0, 0, 1);                   // 0, 0, 1
+            error += Reprojection(pMP->GetPosition(), point2d, frame->Tcw(), cameraMatrix);
         }
 
-        if (frames.size() <= 3 || biggestId < frames.size() - 10)
+        error /= frames.size();
+        bool oldPoint = frames.size() <= 3 && biggestId < frames.size() - 10;
+
+        if (oldPoint || error >= 0.02)
         {
             old = true;
             mapPoints.erase(pMP);

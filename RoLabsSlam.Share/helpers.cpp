@@ -459,7 +459,32 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Fram
     return trackedPtsCnt;
 }
 
-int SearchWithOpticalFlow(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, cv::Mat currentImage, cv::Mat previousImage)
-{
+float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, const cv::Mat& Tcw, const cv::Mat& cameraMatrix) {
+    // Step 1: Convert 3D world point to homogeneous coordinates (4x1 matrix)
+    cv::Mat point3d_homogeneous = (cv::Mat_<float>(4, 1) << point3world.x, point3world.y, point3world.z, 1.0);
 
+    // Step 2: Transform the 3D point from world coordinates to camera coordinates using Tcw
+    cv::Mat point3d_camera = Tcw * point3d_homogeneous;
+
+    // Step 3: Normalize the camera coordinates (i.e., divide by z to project to the image plane)
+    float X = point3d_camera.at<float>(0);
+    float Y = point3d_camera.at<float>(1);
+    float Z = point3d_camera.at<float>(2);
+
+    if (Z <= 0) {
+        std::cerr << "Point is behind the camera, cannot project!" << std::endl;
+        return -1.0f; // Invalid projection
+    }
+
+    // Step 4: Apply the camera intrinsic matrix (cameraMatrix) to project to 2D image coordinates
+    cv::Mat projected_point2d_homogeneous = cameraMatrix * (cv::Mat_<float>(3, 1) << X / Z, Y / Z, 1.0);
+
+    // Extract the projected 2D point
+    float u_projected = projected_point2d_homogeneous.at<float>(0) / projected_point2d_homogeneous.at<float>(2);
+    float v_projected = projected_point2d_homogeneous.at<float>(1) / projected_point2d_homogeneous.at<float>(2);
+
+    // Step 5: Calculate the reprojection error as the Euclidean distance between the observed 2D point and the projected point
+    float reprojection_error = sqrt(pow(point2f.x - u_projected, 2) + pow(point2f.y - v_projected, 2));
+
+    return reprojection_error;
 }
