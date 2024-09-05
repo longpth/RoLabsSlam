@@ -57,7 +57,7 @@ Build the solution to compile the C# Windows Forms application.</br>
 After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization.</br>
 
 ### License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details. For dependencies, please refer to their respective licenses.
 
 ### Acknowledgements
 OpenCVSharp for providing an easy way to integrate OpenCV with C#.</br>
