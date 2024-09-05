@@ -31,6 +31,8 @@ extern std::vector<cv::Point3d> MyTriangulatePoints(
 
 extern int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask);
 
+extern int SearchInLocalMap(std::shared_ptr<Frame> currentFrame, const std::set<std::shared_ptr<MapPoint>>& localMap);
+
 extern double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds);
 
 extern double Normalize3DPoints(std::vector<cv::Point3d>& point3Ds, std::vector<double>& medianDepthVector);

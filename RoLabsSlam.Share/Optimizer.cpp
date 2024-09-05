@@ -179,10 +179,11 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
 {
     assert(frames.size() > 0);
 
-    int minSize = std::min((int)frames.size(), windowSize);
+    int localFrameSize = std::min((int)frames.size(), windowSize);
     int lastIndex = frames.size() - 1;
     int lastLocalFrameId = frames[lastIndex]->Id();
-    int firstLocalFrameId = frames[lastIndex]->Id() - minSize + 1;
+    int firstLocalFrameId = frames[lastIndex]->Id() - localFrameSize + 1;
+    int checkedFrameSize = std::min((int)frames.size(), windowSize * 2);
 
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
@@ -197,8 +198,12 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
 
     unsigned long maxKFid = 0;
 
+    std::vector<std::shared_ptr<Frame>>::iterator lit = (frames.end() - 1) - (checkedFrameSize - 1);
+
+    std::vector<std::shared_ptr<Frame>>::iterator lend = frames.end();
+
     // Set frame vertices
-    for (std::vector<std::shared_ptr<Frame>>::iterator lit = frames.begin(), lend = frames.end(); lit != lend; lit++)
+    for (; lit != lend; lit++)
     {
         Frame* pKFi = lit->get();
         g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
@@ -247,6 +252,15 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
             //std::cout << "[Cpp] Edge count " << edgeCount << std::endl;
             edgeCount++;
             Frame* pKFi = mit->first.get();
+
+            int frameId = pKFi->Id();
+
+            if (frameId <= maxKFid - checkedFrameSize)
+                continue;
+
+            //std::cout << "[Cpp] BA Added frame id as edge " << frameId << std::endl;
+            //std::cout << "[Cpp] maxKFid = " << maxKFid << std::endl;
+            //std::cout << "[Cpp] checkedFrameSize = " << checkedFrameSize << std::endl;
 
             const cv::KeyPoint& kp = pKFi->KeyPoints()[mit->second];
 
@@ -346,7 +360,7 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
 
     // Recover optimized data
 
-    std::cout << "[Cpp] Bundle Adjustment >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n";
+    std::cout << "[Cpp] Bundle Adjustment Map point size = " << mapPoints.size() << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n";
 
     // Frames update
     for (std::vector<std::shared_ptr<Frame>>::iterator lit = frames.begin() + firstLocalFrameId, lend = frames.begin() + lastLocalFrameId; lit != lend; lit++)

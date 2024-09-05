@@ -228,18 +228,21 @@ void Slam::trackWithMotionModel()
     }
 
     START_MEASURE_TIME("BundleAdjustment2")
-    if (_allFrames.size() >= 10 && _allFrames.size() % 10 == 0 && trackedPtsCnt > 80) {
+    if (_allFrames.size() >= 10 && _allFrames.size() % 5 == 0 && trackedPtsCnt > 80) {
         // Do bundle adjustment
         Optimizer::BundleAdjustment2(_allFrames, _localMap, _cameraInfo);
     }
     STOP_MEASURE_TIME("BundleAdjustment2")
 
     if (createMapPointSuccess) {
-        // calculate the motion velocity
-        _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+
     } else{
-        _velocity = cv::Mat::eye(4, 4, CV_64F); // 4x4 identity matrix
+        _currentFrame->SetTcw(_velocity * _previousFrame->Tcw());
     }
+
+    // calculate the motion velocity
+
+    _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
 }
 
 #define DEBUG 0
@@ -258,14 +261,14 @@ bool Slam::createMapPoints(std::vector<bool> mask)
         }
     }
 
-    std::vector<bool> mask1;
-    std::vector<cv::Point2f> previousFramePoints = trackKeypointsOpticalFlow(_previousImage, _currentImage, currentFramePoints, mask1);
+    std::vector<bool> maskOpticalFlow;
+    std::vector<cv::Point2f> previousFramePoints = trackKeypointsOpticalFlow(_previousImage, _currentImage, currentFramePoints, maskOpticalFlow);
     std::vector<cv::Point2f> currentFramePointsFilter; // the currentFramePoints which have the previous points calculated by opticalflow
     std::vector<cv::Point2f> previousFramePointsFilter; // the currentFramePoints which have the previous points calculated by opticalflow
 
-    for (size_t i = 0; i < mask1.size(); ++i)
+    for (size_t i = 0; i < maskOpticalFlow.size(); ++i)
     {
-        if (mask1[i]) {
+        if (maskOpticalFlow[i]) {
             currentFramePointsFilter.push_back(currentFramePoints[i]);
             previousFramePointsFilter.push_back(previousFramePoints[i]);
         }
@@ -299,30 +302,54 @@ bool Slam::createMapPoints(std::vector<bool> mask)
     cv::Mat R, t, mask2;
     int inliersCount = cv::recoverPose(essential_matrix, previousFramePointsFilter, currentFramePointsFilter, _intrinsicCameraMatrix, R, t, mask2); // five-point.cpp opencv
 
-    float percentageInliers = (float)inliersCount / (float)currentFramePointsFilter.size();
-
-    if (percentageInliers < 0.1)
+    if (inliersCount < 80)
     {
-        return false;
+        std::cout << "inliers from recoverPose are not enough " << inliersCount << "\n";
+        ret = false;
     }
-
-    if (percentage_tracked_optical >= 0.1)
+    else
     {
         // Filter inliers and prepare for triangulation
         std::vector<cv::Point2f> currentPoints, previousPoints;
 
-        int j = 0;
-        for (size_t i = 0; i < mask1.size(); ++i)
+        // track with BFMatcher
+        std::vector<cv::KeyPoint> inlierPreviousFrameKeypoints; // Output inliers for previousFrame
+        std::vector<cv::KeyPoint> inlierCurrentFrameKeypoints;  // Output inliers for currentFrame
+        std::vector<int> previousIndices, currentIndices;       // Output valid descriptors
+
+        if (percentage_tracked_optical >= 0.1)
         {
-            if (mask1[i]) {
-                mask1[i] = bool(mask2.at<uchar>(j));
-                if (mask2.at<uchar>(j))
+            int j = 0;
+            for (size_t i = 0; i < maskOpticalFlow.size(); ++i)
+            {
+                if (maskOpticalFlow[i]) {
+                    maskOpticalFlow[i] = bool(mask2.at<uchar>(j));
+                    if (mask2.at<uchar>(j))
+                    {
+                        // Keep the inliers
+                        currentPoints.push_back(currentFramePointsFilter[j]);
+                        previousPoints.push_back(previousFramePointsFilter[j]);
+                    }
+                    j++;
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < mask2.rows; i++)
+            {
+                if (mask2.at<uchar>(i))
                 {
                     // Keep the inliers
-                    currentPoints.push_back(currentFramePointsFilter[j]);
-                    previousPoints.push_back(previousFramePointsFilter[j]);
+                    inlierCurrentFrameKeypoints.push_back(_currentFrame->KeyPoints()[good_matches[i].queryIdx]);
+                    inlierPreviousFrameKeypoints.push_back(_previousFrame->KeyPoints()[good_matches[i].trainIdx]);
+                    currentPoints.push_back(currentFramePointsFilter[i]);
+                    previousPoints.push_back(previousFramePointsFilter[i]);
+
+                    // Keep the descriptors of inliers
+                    currentIndices.push_back(good_matches[i].queryIdx);
+                    previousIndices.push_back(good_matches[i].trainIdx);
                 }
-                j++;
             }
         }
 
@@ -345,8 +372,7 @@ bool Slam::createMapPoints(std::vector<bool> mask)
 
             cv::imshow("Optical Flow", debugImage);
             cv::waitKey(1);  // Wait for a key press to close the window
-        }
-
+    }
 #endif
 
         // Create 3x4 matrices by selecting the first three rows of Tcw (ignoring the last row)
@@ -375,165 +401,104 @@ bool Slam::createMapPoints(std::vector<bool> mask)
 
             _currentFrame->SetTcw(curTcw);
 
-            // Create new 3d points from the current frame keypoint which are not in matched by the above projection search
-            size_t k = 0;
-            size_t kk = 0;
             int newPoint = 0;
-            for (int i = 0; i < _currentFrame->KeyPoints().size(); i++)
+
+            if (percentage_tracked_optical >= 0.1) // create new points with optical flow
             {
-                auto mp = _currentFrame->GetMapPoints()[i];
-                if (!mask[i]) // not yet and map point, and it is a valid tracked point
+                // Create new 3d points from the current frame keypoint which are not in matched by the above projection search
+                size_t k = 0;
+                size_t kk = 0;
+                for (int i = 0; i < _currentFrame->KeyPoints().size(); i++)
                 {
-                    if (mask1[k])
+                    auto mp = _currentFrame->GetMapPoints()[i];
+                    if (!mask[i]) // not yet and map point, and it is a valid tracked point
                     {
-                        if (p3ds[kk].z > 0 && mask3d[kk] == true)
+                        if (maskOpticalFlow[k])
                         {
-                            // Convert the 3D point to homogeneous coordinates (4x1 vector)
-                            cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[kk].x, p3ds[kk].y, p3ds[kk].z, 1.0);
+                            if (p3ds[kk].z > 0 && mask3d[kk] == true)
+                            {
+                                // Convert the 3D point to homogeneous coordinates (4x1 vector)
+                                cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[kk].x, p3ds[kk].y, p3ds[kk].z, 1.0);
 
-                            // Transform the point from camera coordinates to world coordinates using Tcw
-                            cv::Mat pointWorldHomogeneous = _currentFrame->Tcw().inv() * pointCameraHomogeneous;
+                                // Transform the point from camera coordinates to world coordinates using Tcw
+                                cv::Mat pointWorldHomogeneous = _currentFrame->Tcw().inv() * pointCameraHomogeneous;
 
-                            // Convert back to a 3D point in world coordinates
-                            cv::Point3d pointWorld(
-                                pointWorldHomogeneous.at<double>(0) / pointWorldHomogeneous.at<double>(3),
-                                pointWorldHomogeneous.at<double>(1) / pointWorldHomogeneous.at<double>(3),
-                                pointWorldHomogeneous.at<double>(2) / pointWorldHomogeneous.at<double>(3)
-                            );
+                                // Convert back to a 3D point in world coordinates
+                                cv::Point3d pointWorld(
+                                    pointWorldHomogeneous.at<double>(0) / pointWorldHomogeneous.at<double>(3),
+                                    pointWorldHomogeneous.at<double>(1) / pointWorldHomogeneous.at<double>(3),
+                                    pointWorldHomogeneous.at<double>(2) / pointWorldHomogeneous.at<double>(3)
+                                );
 
-                            newPoint++;
-                            _currentFrame->GetMapPoints()[i] = std::make_shared<MapPoint>();
-                            _currentFrame->GetMapPoints()[i]->SetPosition(pointWorld);
-                            _currentFrame->GetMapPoints()[i]->SetDescriptor(_currentFrame->Descriptors().row(i));
+                                newPoint++;
+                                _currentFrame->GetMapPoints()[i] = std::make_shared<MapPoint>();
+                                _currentFrame->GetMapPoints()[i]->SetPosition(pointWorld);
+                                _currentFrame->GetMapPoints()[i]->SetDescriptor(_currentFrame->Descriptors().row(i));
+                            }
+                            kk++;
                         }
-                        kk++;
+                        k++;
                     }
-                    k++;
                 }
-#if false
-                else if (mp)
-                {
-                    // For DEBUG
-                    cv::circle(debugImage, _currentFrame->KeyPoints()[i].pt, 3, cv::Scalar(255, 0, 0), -1);
-                }
-                // For DEBUG
-                cv::imshow("Optical Flow", debugImage);
-                cv::waitKey(1);  // Wait for a key press to close the window
-#endif
             }
-            std::cout << "[Cpp] New 3d points " << newPoint << std::endl;
+            else // create new point by BFMacher
+            {
+                std::vector<std::shared_ptr<MapPoint>>& current_map_points = _currentFrame->GetMapPoints();
+                std::vector<std::shared_ptr<MapPoint>>& previous_map_points = _previousFrame->GetMapPoints();
+
+                for (int i = 0; i < p3ds.size(); i++)
+                {
+                    if (p3ds[i].z < 0 || mask3d[i] == false || current_map_points[currentIndices[i]] != nullptr)
+                        continue; // Skip points with Z < 0 or the point already created by reprojection or less parralax
+
+                    if (previous_map_points[previousIndices[i]]) // map point already associated with the keypoint in previous frame
+                    {
+                        bool existedMapPoint = false;
+                        // check if this previous map point has already assigned for the current frame map or not
+                        for (auto mp : current_map_points)
+                        {
+                            if (mp && (mp->Id() == previous_map_points[previousIndices[i]]->Id()))
+                            {
+                                existedMapPoint = true;
+                                break;
+                            }
+                        }
+                        if (!existedMapPoint)
+                        {
+                            current_map_points[currentIndices[i]] = previous_map_points[previousIndices[i]];
+                            current_map_points[currentIndices[i]]->AddObservation(_currentFrame, currentIndices[i]);
+                        }
+                    }
+                    else
+                    {
+                        // Convert the 3D point to homogeneous coordinates (4x1 vector)
+                        cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[i].x, p3ds[i].y, p3ds[i].z, 1.0);
+
+                        // Transform the point from camera coordinates to world coordinates using Tcw
+                        cv::Mat pointWorldHomogeneous = _currentFrame->Tcw().inv() * pointCameraHomogeneous;
+
+                        // Convert back to a 3D point in world coordinates
+                        cv::Point3d pointWorld(
+                            pointWorldHomogeneous.at<double>(0) / pointWorldHomogeneous.at<double>(3),
+                            pointWorldHomogeneous.at<double>(1) / pointWorldHomogeneous.at<double>(3),
+                            pointWorldHomogeneous.at<double>(2) / pointWorldHomogeneous.at<double>(3)
+                        );
+
+                        current_map_points[currentIndices[i]] = std::make_shared<MapPoint>();
+                        current_map_points[currentIndices[i]]->SetPosition(pointWorld);
+                        current_map_points[currentIndices[i]]->SetDescriptor(_currentFrame->Descriptors().row(currentIndices[i]));
+                        newPoint++;
+                    }
+                }
+                std::cout << "[Cpp] New 3d points " << newPoint << std::endl;
+            }
         }
+        // could not create new keypoints
         else
         {
             ret = false;
         }
     }
-    else
-    {
-        int newPoint = 0;
-        // track with BFMatcher
-        std::vector<cv::KeyPoint> inlierPreviousFrameKeypoints; // Output inliers for previousFrame
-        std::vector<cv::KeyPoint> inlierCurrentFrameKeypoints;  // Output inliers for currentFrame
-
-        std::vector<cv::Point2f> currentPoints, previousPoints;
-        std::vector<int> previousIndices, currentIndices;       // Output valid descriptors
-
-        for (int i = 0; i < mask2.rows; i++)
-        {
-            if (mask2.at<uchar>(i))
-            {
-                // Keep the inliers
-                inlierCurrentFrameKeypoints.push_back(_currentFrame->KeyPoints()[good_matches[i].queryIdx]);
-                inlierPreviousFrameKeypoints.push_back(_previousFrame->KeyPoints()[good_matches[i].trainIdx]);
-                currentPoints.push_back(currentFramePointsFilter[i]);
-                previousPoints.push_back(previousFramePointsFilter[i]);
-
-                // Keep the descriptors of inliers
-                currentIndices.push_back(good_matches[i].queryIdx);
-                previousIndices.push_back(good_matches[i].trainIdx);
-            }
-        }
-
-        // Projection matrices for the two views
-        cv::Mat P0 = _intrinsicCameraMatrix * cv::Mat::eye(3, 4, CV_64F); // [I | 0]
-        cv::Mat P1(3, 4, CV_64F);
-        R.copyTo(P1(cv::Rect(0, 0, 3, 3))); // Copy R into the first 3x3 part of P1
-        t.copyTo(P1(cv::Rect(3, 0, 1, 3))); // Copy t into the last column of P1
-        P1 = _intrinsicCameraMatrix * P1;
-
-        // Triangulate points
-        std::vector<bool> mask3d;
-        int goodParallaxCnt = 0;
-        std::vector<cv::Point3d> p3ds = MyTriangulatePoints(P1, P0, currentPoints, previousPoints, mask3d, goodParallaxCnt);
-
-        Normalize3DPoints(p3ds, _invertmedianDepth);
-
-        if (p3ds.size() > 0) {
-
-            t *= _invertmedianDepth;
-
-            cv::Mat relTransformation = CreateTransformationMatrix(R, t);
-            cv::Mat preTcw = _previousFrame->Tcw();
-
-            cv::Mat curTcw = relTransformation * preTcw;
-
-            _currentFrame->SetTcw(curTcw);
-
-            std::vector<std::shared_ptr<MapPoint>>& current_map_points = _currentFrame->GetMapPoints();
-            std::vector<std::shared_ptr<MapPoint>>& previous_map_points = _previousFrame->GetMapPoints();
-
-            for (int i = 0; i < p3ds.size(); i++)
-            {
-                if (p3ds[i].z < 0 || mask3d[i] == false || current_map_points[currentIndices[i]] != nullptr)
-                    continue; // Skip points with Z < 0 or the point already created by reprojection or less parralax
-
-                if (previous_map_points[previousIndices[i]]) // map point already associated with the keypoint in previous frame
-                {
-                    bool existedMapPoint = false;
-                    // check if this previous map point has already assigned for the current frame map or not
-                    for (auto mp : current_map_points)
-                    {
-                        if (mp && (mp->Id() == previous_map_points[previousIndices[i]]->Id()))
-                        {
-                            existedMapPoint = true;
-                            break;
-                        }
-                    }
-                    if (!existedMapPoint)
-                    {
-                        current_map_points[currentIndices[i]] = previous_map_points[previousIndices[i]];
-                        current_map_points[currentIndices[i]]->AddObservation(_currentFrame, currentIndices[i]);
-                    }
-                }
-                else
-                {
-                    // Convert the 3D point to homogeneous coordinates (4x1 vector)
-                    cv::Mat pointCameraHomogeneous = (cv::Mat_<double>(4, 1) << p3ds[i].x, p3ds[i].y, p3ds[i].z, 1.0);
-
-                    // Transform the point from camera coordinates to world coordinates using Tcw
-                    cv::Mat pointWorldHomogeneous = _currentFrame->Tcw().inv() * pointCameraHomogeneous;
-
-                    // Convert back to a 3D point in world coordinates
-                    cv::Point3d pointWorld(
-                        pointWorldHomogeneous.at<double>(0) / pointWorldHomogeneous.at<double>(3),
-                        pointWorldHomogeneous.at<double>(1) / pointWorldHomogeneous.at<double>(3),
-                        pointWorldHomogeneous.at<double>(2) / pointWorldHomogeneous.at<double>(3)
-                    );
-
-                    current_map_points[currentIndices[i]] = std::make_shared<MapPoint>();
-                    current_map_points[currentIndices[i]]->SetPosition(pointWorld);
-                    current_map_points[currentIndices[i]]->SetDescriptor(_currentFrame->Descriptors().row(currentIndices[i]));
-                    newPoint++;
-                }
-            }
-            std::cout << "[Cpp] New 3d points " << newPoint << std::endl;
-        }
-        else
-        {
-            ret = false;
-        }
-    }
-
     return ret;
 }
 

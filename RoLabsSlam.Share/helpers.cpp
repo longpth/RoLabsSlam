@@ -375,6 +375,84 @@ std::vector<cv::Point2f> TrackKeypointsOpticalFlow(const cv::Mat& prevImg, const
     return prevKeypoints;
 }
 
+int SearchInLocalMap(std::shared_ptr<Frame> currentFrame,const std::set<std::shared_ptr<MapPoint>>& localMap)
+{
+    int trackedPtsCnt = 0;
+
+    std::vector<cv::KeyPoint> currentFrameKps = currentFrame->KeyPoints();
+
+    std::vector<std::shared_ptr<MapPoint>> currentFrameMap = currentFrame->GetMapPoints();
+    if (currentFrameMap.size() == 0)
+    {
+        currentFrame->InitializeMapPoints();
+    }
+
+    cv::Mat currentFrameDesc = currentFrame->Descriptors(); // Assuming Descriptors() returns a cv::Mat
+
+    int width = currentFrame->Width();
+    int height = currentFrame->Height();
+
+    int outPointCnt = 0;
+    int descriptorDistanceOutCnt = 0;
+
+    std::vector<std::shared_ptr<MapPoint>> localMapVec;
+
+    // Step 1: Initialize an empty matrix to hold all the descriptors
+    cv::Mat localMapDescriptors;
+
+    // Step 2: Iterate over the localMap and get the descriptors
+    for (const auto& mp_ptr : localMap) {
+
+        cv::Mat descriptor = mp_ptr->GetDescriptor();
+
+        if (descriptor.empty()) {
+            continue;  // Skip map points with empty descriptors
+        }
+
+        // Step 3: Append the descriptor to the localMapDescriptors matrix
+        if (localMapDescriptors.empty()) {
+            // If localMapDescriptors is empty, just assign the first descriptor
+            localMapDescriptors = descriptor.clone();
+        }
+        else {
+            // Append the current descriptor as a new row
+            localMapDescriptors.push_back(descriptor);
+        }
+
+        localMapVec.push_back(mp_ptr);
+    }
+
+    // Use BFMatcher to match descriptors
+    cv::BFMatcher matcher(cv::NORM_HAMMING);
+    std::vector<std::vector<cv::DMatch>> knnMatches;
+    matcher.knnMatch(currentFrameDesc, localMapDescriptors, knnMatches, 2);
+
+    std::vector<cv::DMatch> goodMatches;
+    std::vector<int> idx1, idx2;
+    std::set<int> idx1s, idx2s;
+
+    for (const auto& matchPair : knnMatches) {
+        if (matchPair[0].distance < 0.75f * matchPair[1].distance) {
+            int currentFrameMapPointIndex = matchPair[0].queryIdx;
+            int localMapPointIndex = matchPair[0].trainIdx;
+
+            // Be within ORB distance 32
+            if (matchPair[0].distance < 32) {
+                if (!currentFrameMap[currentFrameMapPointIndex]) // not yet assigned a map point
+                {
+                    currentFrameMap[currentFrameMapPointIndex] = localMapVec[localMapPointIndex];
+                    trackedPtsCnt++;
+                }
+            }
+        }
+    }
+
+    //std::cout << "[Cpp] search by projection " << mapPoints.size() << " 2d out point count " << outPointCnt << std::endl;
+    //std::cout << "[Cpp] search by projection " << mapPoints.size() << " descriptorDistanceOutCnt " << descriptorDistanceOutCnt << std::endl;
+
+    return trackedPtsCnt;
+}
+
 int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Frame> previousFrame, const cv::Mat& intrinsicCameraMatrix, int searchRadius, std::vector<bool>& mask)
 {
     const std::vector<std::shared_ptr<MapPoint>>& mapPoints = previousFrame->GetMapPoints();
@@ -455,7 +533,9 @@ int SearchByProjection(std::shared_ptr<Frame> currentFrame, std::shared_ptr<Fram
 
         if (bestDescriptorDistance < ORB_HARMING_DISTANCE_THRESHOLD)
         {
-            currentFrame->GetMapPoints()[bestIndex] = mp_ptr; // Store map point in current frame
+            if (currentFrame->GetMapPoints()[bestIndex] == nullptr) {
+                currentFrame->GetMapPoints()[bestIndex] = mp_ptr; // Store map point in current frame
+            }
             //mp_ptr->AddObservation(currentFrame, bestIndex); // Add observer
             mask[bestIndex] = true; //mark that this index of keypoint has an associated map point
             trackedPtsCnt++;
