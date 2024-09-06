@@ -404,3 +404,6 @@ FodyWeavers.xsd
 *.lib
 
 *.exe
+
+# Keep a specific .lib file
+!g2o.lib

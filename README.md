@@ -13,7 +13,6 @@ RoLabsSlam/
 ├── RoLabsSlam.Windows/             # Exported DLL from C++ project
 ├── RoLabsSlam.Windows.Test/        # Main Windows Forms application
 ├── RoLabsSlamSharp/                # C# bindings and utilities
-├── tesseract_vcpkg_0.0.8-beta/     # Tesseract OCR dependencies via vcpkg (for future use)
 ├── ThirdParty/                     # Additional third-party dependencies (e.g., g2o, Eigen)
 ├── .gitignore                      # Git ignore file
 ├── README.md                       # Project documentation (this file)
@@ -45,6 +44,7 @@ cd RoLabsSlam
 ```
 
 2. Configure and Build C++ Core
+Download the prbuilt opencv libraries from https://github.com/shimat/opencv_files/releases and place it in RoLabsSlam\opencv_files\opencv4100_win_x64 </br>
 Build with visual studio
 
 3. Build the C# Application
@@ -52,6 +52,8 @@ Build with visual studio
 Open RoLabsSlam.sln in Visual Studio.</br>
 Restore NuGet packages.</br>
 Build the solution to compile the C# Windows Forms application.</br>
+
+Note: You need to rebuild RoLabsSlam.Windows.Test to run the test so that the C++ RoLabsSlam.Windows.dll and RoLabsSlam.Windows.pdb files are copied to the runtime folder during the post-build event when the C++ project is rebuilt. Alternatively, you can manually copy RoLabsSlam.Windows.dll and RoLabsSlam.Windows.pdb to RoLabsSlam.Windows.Test\bin\Debug\net8.0-windows10.0.xxxxx.0\runtimes\win-x64\native.
 
 ### Running the Application
 After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization.</br>
