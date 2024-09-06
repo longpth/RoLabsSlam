@@ -7,6 +7,7 @@ RoLabsSlam is a Visual SLAM (Simultaneous Localization and Mapping) application 
 ```plaintext
 RoLabsSlam/
 ├── .vs/                            # Visual Studio settings folder
+├── Datasets/                       # Tested video
 ├── opencv_files/                   # Prebuilt OpenCV 4 libraries from https://github.com/shimat/opencv_files
 ├── OpenCvSharp/                    # Wrapper library for OpenCV in C#, reference: https://github.com/shimat/opencvsharp
 ├── RoLabsSlam.Share/               # Visual slam implementation C++ code
@@ -60,7 +61,7 @@ Note: You need to rebuild RoLabsSlam.Windows.Test to run the test so that the C+
 After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization.</br>
 
 ### License
-This project is licensed under the MIT License - see the LICENSE file for details. For dependencies, please refer to their respective licenses.
+This project is licensed under the MIT License - see the LICENSE file for details. For dependencies, dataset, please refer to their respective licenses.
 
 ### Acknowledgements
 OpenCVSharp for providing an easy way to integrate OpenCV with C#.</br>
