@@ -100,7 +100,7 @@
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)\opencv_files\opencv4100_win_x64\include;$(SolutionDir)\RolabsSlam.Share;$(SolutionDir)\ThirdParty\g2o;$(SolutionDir)\ThirdParty\eigen;$(IncludePath)</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)\opencv_files\opencv4100_win_x64\include;$(SolutionDir)\RolabsSlam.Share;$(SolutionDir)\ThirdParty\g2o;$(SolutionDir)\ThirdParty\eigen;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)\opencv_files\opencv4100_win_x64\x64\debug\vc17\staticlib;$(SolutionDir)\RoLabsSlam.Windows.Test\libs\x64;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)\opencv_files\opencv4100_win_x64\x64\debug\vc17\staticlib;$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)\opencv_files\opencv4100_win_x64\x64\vc17\staticlib;$(SolutionDir)\ThirdParty\g2o\bin\Release;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)\opencv_files\opencv4100_win_x86\include;$(IncludePath)</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)\opencv_files\opencv4100_win_x86\include;$(IncludePath)</IncludePath>

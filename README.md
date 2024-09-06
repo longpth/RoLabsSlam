@@ -14,6 +14,7 @@ RoLabsSlam/
 ├── RoLabsSlam.Windows.Test/        # Main Windows Forms application
 ├── RoLabsSlamSharp/                # C# bindings and utilities
 ├── ThirdParty/                     # Additional third-party dependencies (e.g., g2o, Eigen)
+├── Tools/                          # python scripts for creating test video from image files, experiment, ...
 ├── .gitignore                      # Git ignore file
 ├── README.md                       # Project documentation (this file)
 └── RoLabsSlam.sln                  # Visual Studio solution file

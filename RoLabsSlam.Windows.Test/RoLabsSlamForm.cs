@@ -24,7 +24,7 @@ namespace RoLabsSlam.Test
     }
     public partial class RoLabsSlamForm : Form
     {
-        private readonly string videoPath = @"\..\..\..\..\..\dataset\kitti_sequence_00.mp4";
+        private readonly string videoPath = @"\..\..\Datasets\kitti_sequence_00_501.mp4";
 
         private readonly float VisualizedScaled = 20.0f;
 
@@ -37,7 +37,7 @@ namespace RoLabsSlam.Test
         private int _gtIndex = 0;
         private readonly int CameraTimePerFrame = 100; //ms
 
-        private bool _addPoints = false;
+        private bool _addPoints = true;
         private float _fps;
 
         //private float camera_fx = 458.654f, camera_fy = 457.296f, camera_cx = 367.215f, camera_cy = 248.375f; // euroC
@@ -67,6 +67,7 @@ namespace RoLabsSlam.Test
             radioReal.Checked = true;
 
             textBoxGT.Text = @"D:\\work\\125.MyRobotics\\dataset\\00\\poses\\00.txt";
+            checkBoxPointCloud.Checked = true;
         }
 
         private void InitializeVideoCapture()
@@ -226,6 +227,11 @@ namespace RoLabsSlam.Test
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string projectDir = Directory.GetParent(baseDir).Parent.Parent.FullName;
                 string videoPathMerged = textBoxVideoPath.Text == "" ? projectDir + videoPath : textBoxVideoPath.Text;
+                textBoxVideoPath.Invoke(new Action(() =>
+                {
+                    textBoxVideoPath.Text = videoPathMerged;
+                }));
+
                 _videoCapture = new VideoCapture(videoPathMerged);
                 _timer.Start();
                 if (radioGT.Checked == true)
