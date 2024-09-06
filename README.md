@@ -1,6 +1,6 @@
 # RoLabsSlam
 
-RoLabsSlam is a Visual SLAM (Simultaneous Localization and Mapping) application designed with a core written in C++ and visualization implemented using C# Windows Forms. The 3D rendering is supported by OpenTK. The project relies on several key dependencies, including OpenCVSharp for video processing and keypoint display, g2o for graph and camera pose optimization, and Eigen for linear algebra.
+RoLabsSlam is a Visual SLAM (Simultaneous Localization and Mapping) application with a core written in C++ and visualization implemented using C# Windows Forms. It uses OpenTK for 3D rendering and relies on several key dependencies, including OpenCVSharp for video processing and keypoint display, g2o for graph and camera pose optimization, and Eigen for linear algebra. The project is currently focused on monocular camera setups.
 
 ## Project Structure
 
@@ -57,7 +57,7 @@ Build the solution to compile the C# Windows Forms application.</br>
 After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization.</br>
 
 ### License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details. For dependencies, please refer to their respective licenses.
 
 ### Acknowledgements
 OpenCVSharp for providing an easy way to integrate OpenCV with C#.</br>
