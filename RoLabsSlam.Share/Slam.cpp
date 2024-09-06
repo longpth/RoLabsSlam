@@ -227,18 +227,19 @@ void Slam::trackWithMotionModel()
         }
     }
 
+    if (createMapPointSuccess) {
+
+    }
+    else {
+        _currentFrame->SetTcw(_previousFrame->Tcw());
+    }
+
     START_MEASURE_TIME("BundleAdjustment2")
     if (_allFrames.size() >= 10 && _allFrames.size() % 5 == 0 && trackedPtsCnt > 80) {
         // Do bundle adjustment
         Optimizer::BundleAdjustment2(_allFrames, _localMap, _cameraInfo);
     }
     STOP_MEASURE_TIME("BundleAdjustment2")
-
-    if (createMapPointSuccess) {
-
-    } else{
-        _currentFrame->SetTcw(_velocity * _previousFrame->Tcw());
-    }
 
     // calculate the motion velocity
 
@@ -302,7 +303,7 @@ bool Slam::createMapPoints(std::vector<bool> mask)
     cv::Mat R, t, mask2;
     int inliersCount = cv::recoverPose(essential_matrix, previousFramePointsFilter, currentFramePointsFilter, _intrinsicCameraMatrix, R, t, mask2); // five-point.cpp opencv
 
-    if (inliersCount < 80)
+    if (inliersCount < 50)
     {
         std::cout << "inliers from recoverPose are not enough " << inliersCount << "\n";
         ret = false;

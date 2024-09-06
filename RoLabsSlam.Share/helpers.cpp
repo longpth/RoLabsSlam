@@ -320,7 +320,7 @@ std::vector<cv::Point3d> MyTriangulatePoints(
 
         points3D.emplace_back(X.at<double>(0), X.at<double>(1), X.at<double>(2));
 
-        if (calculateCosParallax(P1, P2, pt3d) < 0.9998)
+        if (CalculateCosParallax(P1, P2, pt3d) < 0.9998)
         {
             mask.push_back(true);
             goodParralaxCnt++;
@@ -583,7 +583,7 @@ float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, c
 }
 
 // Function to calculate the parallax between two rays in two views
-double calculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D) {
+double CalculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D) {
     // Extract camera centers from projection matrices P1 and P2
     // The camera center is the null space of the projection matrix (P * C = 0)
     cv::Mat C1 = -P1.colRange(0, 3).inv() * P1.col(3);

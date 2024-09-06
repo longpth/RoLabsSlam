@@ -43,4 +43,4 @@ extern double FindMedianDepth(std::vector<cv::Point3d>& point3Ds, cv::Mat Tcw = 
 
 extern float Reprojection(const cv::Point3f& point3world, const cv::Point2f& point2f, const cv::Mat& Tcw, const cv::Mat& cameraMatrix);
 
-extern double calculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D);
+extern double CalculateCosParallax(const cv::Mat& P1, const cv::Mat& P2, const cv::Point3d& point3D);

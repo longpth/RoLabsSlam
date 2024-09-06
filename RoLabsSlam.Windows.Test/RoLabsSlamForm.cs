@@ -24,6 +24,8 @@ namespace RoLabsSlam.Test
     }
     public partial class RoLabsSlamForm : Form
     {
+        private readonly string videoPath = @"\..\..\..\..\..\dataset\kitti_sequence_00.mp4";
+
         private readonly float VisualizedScaled = 20.0f;
 
         private VideoCapture _videoCapture;
@@ -35,7 +37,8 @@ namespace RoLabsSlam.Test
         private int _gtIndex = 0;
         private readonly int CameraTimePerFrame = 100; //ms
 
-        bool _addPoints = false;
+        private bool _addPoints = false;
+        private float _fps;
 
         //private float camera_fx = 458.654f, camera_fy = 457.296f, camera_cx = 367.215f, camera_cy = 248.375f; // euroC
 
@@ -108,7 +111,10 @@ namespace RoLabsSlam.Test
                     // Record the elapsed time for GrabImage
                     stopwatch.Stop();
 
-                    Console.WriteLine($"Tracking Time: {stopwatch.ElapsedMilliseconds} ms");
+                    float duration = stopwatch.ElapsedMilliseconds;
+                    Console.WriteLine($"Tracking Time: {duration} ms");
+
+                    _fps = 1 / (duration * 0.001f);
 
                     (_keyPointsCurrent, _keyPointsPrevious) = _rolabsSlamWrapper.GetDebugKeyPoints();
                     Mat pose = _rolabsSlamWrapper.GetPose();
@@ -178,6 +184,7 @@ namespace RoLabsSlam.Test
                 }
 
                 frameNo.Invoke(new Action(() => frameNo.Text = $"Frame No: {_gtIndex}"));
+                labelFps.Invoke(new Action(() => labelFps.Text = $"Fps: {_fps}"));
 
             }
             else
@@ -218,9 +225,8 @@ namespace RoLabsSlam.Test
                 _cameraState = CameraState.IsStarted;
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string projectDir = Directory.GetParent(baseDir).Parent.Parent.FullName;
-                //string videoPath = projectDir + @"\..\..\RoLabs\Resources\Raw\slam\video\euroc_V2_01_easy.mp4";
-                string videoPath = projectDir + @"\..\..\..\..\..\dataset\kitti_sequence_00.mp4";
-                _videoCapture = new VideoCapture(videoPath);
+                string videoPathMerged = textBoxVideoPath.Text == "" ? projectDir + videoPath : textBoxVideoPath.Text;
+                _videoCapture = new VideoCapture(videoPathMerged);
                 _timer.Start();
                 if (radioGT.Checked == true)
                 {

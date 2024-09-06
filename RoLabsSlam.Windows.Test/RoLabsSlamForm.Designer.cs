@@ -46,8 +46,11 @@ namespace RoLabsSlam.Test
             pauseButton = new System.Windows.Forms.Button();
             groupBox1 = new GroupBox();
             groupBox2 = new GroupBox();
-            checkBoxPointCloud = new System.Windows.Forms.CheckBox();
             frameNo = new System.Windows.Forms.Label();
+            checkBoxPointCloud = new System.Windows.Forms.CheckBox();
+            labelFps = new System.Windows.Forms.Label();
+            label3 = new System.Windows.Forms.Label();
+            textBoxVideoPath = new TextBox();
             ((System.ComponentModel.ISupportInitialize)pictureBoxRaw).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxProcess).BeginInit();
             groupBox1.SuspendLayout();
@@ -167,6 +170,9 @@ namespace RoLabsSlam.Test
             // 
             // groupBox2
             // 
+            groupBox2.Controls.Add(textBoxVideoPath);
+            groupBox2.Controls.Add(label3);
+            groupBox2.Controls.Add(labelFps);
             groupBox2.Controls.Add(frameNo);
             groupBox2.Controls.Add(checkBoxPointCloud);
             groupBox2.Controls.Add(startButton);
@@ -181,6 +187,15 @@ namespace RoLabsSlam.Test
             groupBox2.TabIndex = 11;
             groupBox2.TabStop = false;
             // 
+            // frameNo
+            // 
+            frameNo.AutoSize = true;
+            frameNo.Location = new System.Drawing.Point(1024, 86);
+            frameNo.Name = "frameNo";
+            frameNo.Size = new System.Drawing.Size(77, 20);
+            frameNo.TabIndex = 11;
+            frameNo.Text = "Frame No:";
+            // 
             // checkBoxPointCloud
             // 
             checkBoxPointCloud.AutoSize = true;
@@ -192,19 +207,36 @@ namespace RoLabsSlam.Test
             checkBoxPointCloud.UseVisualStyleBackColor = true;
             checkBoxPointCloud.CheckedChanged += checkBoxPointCloud_CheckedChanged;
             // 
-            // frameNo
+            // labelFps
             // 
-            frameNo.AutoSize = true;
-            frameNo.Location = new System.Drawing.Point(1037, 27);
-            frameNo.Name = "frameNo";
-            frameNo.Size = new System.Drawing.Size(77, 20);
-            frameNo.TabIndex = 11;
-            frameNo.Text = "Frame No:";
+            labelFps.AutoSize = true;
+            labelFps.Location = new System.Drawing.Point(1024, 58);
+            labelFps.Name = "labelFps";
+            labelFps.Size = new System.Drawing.Size(34, 20);
+            labelFps.TabIndex = 12;
+            labelFps.Text = "Fps:";
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new System.Drawing.Point(1024, 25);
+            label3.Name = "label3";
+            label3.Size = new System.Drawing.Size(83, 20);
+            label3.TabIndex = 13;
+            label3.Text = "Video Path:";
+            // 
+            // textBoxVideoPath
+            // 
+            textBoxVideoPath.Location = new System.Drawing.Point(1113, 19);
+            textBoxVideoPath.Name = "textBoxVideoPath";
+            textBoxVideoPath.Size = new System.Drawing.Size(859, 27);
+            textBoxVideoPath.TabIndex = 14;
             // 
             // RoLabsSlamForm
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
+            AutoSize = true;
             ClientSize = new System.Drawing.Size(1990, 978);
             Controls.Add(groupBox2);
             Controls.Add(groupBox1);
@@ -236,5 +268,8 @@ namespace RoLabsSlam.Test
         private GroupBox groupBox2;
         private System.Windows.Forms.CheckBox checkBoxPointCloud;
         private System.Windows.Forms.Label frameNo;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label labelFps;
+        private TextBox textBoxVideoPath;
     }
 }

@@ -246,12 +246,14 @@ void Optimizer::BundleAdjustment2(std::vector<std::shared_ptr<Frame>>& frames, s
         const std::map<std::shared_ptr<Frame>, uint64_t> observations = pMP->GetObservations();
         const float thHuberMono = sqrt(5.991);
 
+        Frame* pKFi;
+
         // Set edges
         for (std::map<std::shared_ptr<Frame>, uint64_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
         {
             //std::cout << "[Cpp] Edge count " << edgeCount << std::endl;
             edgeCount++;
-            Frame* pKFi = mit->first.get();
+            pKFi = mit->first.get();
 
             int frameId = pKFi->Id();
 
