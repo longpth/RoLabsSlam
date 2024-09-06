@@ -172,11 +172,11 @@ void Slam::initialization()
 void Slam::trackWithMotionModel()
 {
     // Step 1: Set the current camera pose by multiply the velocity and the previous camera pose
-    // Step 2: calculate the camera velocity: velocity = currentPose * previousPose_invert
-    // Step 3: Because we have the current camera pose, so we can do the projection search from 3d map points to match the 3d map points with the current frame keypoints
-    // Step 4: Do the pose optimization using g2o with the map points and current frame keypoints
-    // step 5: Check if we need to create new 3D map points, if yes, create new 3d points from the current frame keypoint which are not in matched by the above projection search by using OpticalFlow to find the 2d point in previous frame then do the triangulation, if could not match with optical flow, matching with BFMacher.
-    // Step 6: Request do bundle adjustment
+    // Step 2: Because we have the current camera pose, so we can do the projection search from 3d map points to match the 3d map points with the current frame keypoints
+    // Step 3: Do the pose optimization using g2o with the map points and current frame keypoints
+    // step 4: Check if we need to create new 3D map points, if yes, create new 3d points from the current frame keypoint which are not in matched by the above projection search by using OpticalFlow to find the 2d point in previous frame then do the triangulation, if could not match with optical flow, matching with BFMacher.
+    // Step 5: Request do bundle adjustment
+    // Step 6: calculate the camera velocity: velocity = currentPose * previousPose_invert
 
     // initialize map points vector with the size of keypoints, but currently the map points are nulls
     _currentFrame->InitializeMapPoints();
