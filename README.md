@@ -60,7 +60,7 @@ Build the solution to compile the C# Windows Forms application.</br>
 Note: You need to rebuild RoLabsSlam.Windows.Test to run the test so that the C++ RoLabsSlam.Windows.dll and RoLabsSlam.Windows.pdb files are copied to the runtime folder during the post-build event when the C++ project is rebuilt. Alternatively, you can manually copy RoLabsSlam.Windows.dll and RoLabsSlam.Windows.pdb to RoLabsSlam.Windows.Test\bin\Debug\net8.0-windows10.0.xxxxx.0\runtimes\win-x64\native.
 
 ### Running the Application
-After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization.</br>
+After successfully building the project, you can run the Windows Forms application directly from Visual Studio. The application will read video files, process keypoints using the SLAM core, and display the results with 3D visualization. Update the intrinsic parameters: camera_fx, camera_fy, camera_cx, and camera_cy in RoLabsSlamForm.cs before running.</br>
 
 ### License
 This project is licensed under the MIT License - see the LICENSE file for details. For dependencies, dataset, please refer to their respective licenses.
