@@ -46,7 +46,7 @@ cd RoLabsSlam
 ```
 
 2. Configure and Build C++ Core
-Download the prbuilt opencv libraries from https://github.com/shimat/opencv_files/releases and place it in RoLabsSlam\opencv_files\opencv4100_win_x64 </br>
+Download the pre-built opencv libraries from https://github.com/shimat/opencv_files/releases and place it in RoLabsSlam\opencv_files\opencv4100_win_x64 </br>
 Build with visual studio
 
 3. Build the C# Application
