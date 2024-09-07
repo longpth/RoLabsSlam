@@ -39,6 +39,11 @@ void Slam::Start() {
         _running = true;
         _frameCount = 0;
         _initializationDone = false;
+        Frame::ResetFrameCount();
+        MapPoint::ResetMapPointCount();
+        _map.clear();
+        _localMap.clear();
+        _allFrames.clear();
     }
 }
 
@@ -71,11 +76,19 @@ void Slam::Track() {
         {
             initialization();
 
-            // velocity = currentPose * previousPose_invert
-            _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+            if (_initializationDone == false)
+            {
+                std::cout << "[Cpp] Initialization fails\n";
+                Frame::ResetFrameCount();
+            }
+            else {
 
-            // add map points
-            updateMap(_currentFrame->GetMapPoints());
+                // velocity = currentPose * previousPose_invert
+                _velocity = _currentFrame->Tcw() * _previousFrame->Tcw().inv();
+
+                // add map points
+                updateMap(_currentFrame->GetMapPoints());
+            }
 
         }
         else
@@ -151,14 +164,18 @@ void Slam::initialization()
     std::cout << "[Cpp] Essential Matrix = " << essential_matrix << std::endl;
 
     // Decompose essential matrix, triangulate points, and filter outliers
-    FindRtAndTriangulate(
+    if (FindRtAndTriangulate(
         essential_matrix,
         _intrinsicCameraMatrix,
         good_matches,
         _currentFrame,
         _previousFrame,
         _invertmedianDepth
-        );
+    )==false)
+    {
+        _initializationDone = false;
+        return;
+    }
 
     _allFrames.push_back(_previousFrame);
     _allFrames.push_back(_currentFrame);

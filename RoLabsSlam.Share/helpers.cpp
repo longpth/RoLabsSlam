@@ -5,7 +5,7 @@
 const int ORB_HARMING_DISTANCE_THRESHOLD = 100;
 
 // Function to decompose essential matrix and triangulate points
-void FindRtAndTriangulate(
+bool FindRtAndTriangulate(
     const cv::Mat& essential_matrix,
     const cv::Mat& cameraMatrix,
     const std::vector<cv::DMatch>& good_matches,
@@ -37,6 +37,12 @@ void FindRtAndTriangulate(
 
     // Recover pose
     int inliersCount = cv::recoverPose(essential_matrix, points2, points1, cameraMatrix, R, t, mask); // five-point.cpp opencv
+
+    if (inliersCount < 50)
+    {
+        std::cout << "inliers from recoverPose are not enough " << inliersCount << "\n";
+        return false;
+    }
 
     std::cout << "[Cpp] Initialization R =" << R << " t = " << t << " inliersCount = " << inliersCount << " = " << (float) inliersCount / (float) points1.size() << "\n";
 

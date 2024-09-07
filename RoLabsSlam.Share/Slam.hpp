@@ -30,7 +30,6 @@ private:
     bool createMapPoints(std::vector<bool> mask);
     std::vector<cv::Point2f> trackKeypointsOpticalFlow(const cv::Mat& prevImg, const cv::Mat& currImg, const std::vector<cv::Point2f>& currKeypoints, std::vector<bool>& mask);
     bool needNewMapPoints(int trackPointCnt);
-    void trackWithPreviousKeyFrame();
 
     std::mutex _image_mutex;
     mutable std::mutex _frame_mutex;

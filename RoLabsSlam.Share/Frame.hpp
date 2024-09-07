@@ -126,6 +126,11 @@ public:
 
     void RemoveMapPoint(MapPoint* mapPoint);
 
+    static void ResetFrameCount()
+    {
+        frameCount = 0;
+    }
+
 private:
     void detectAndCompute(const cv::Mat& image);
     void detectAndCompute2(const cv::Mat& image);

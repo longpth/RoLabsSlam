@@ -173,6 +173,14 @@ void main()
 
         }
 
+        public void ClearPyramidTransformation()
+        {
+            // clear all the camera pose
+            _pyramidTransformations.Clear();
+            // Trigger a repaint to update the view
+            _glControl.Invalidate();
+        }
+
         public void AddPyramidTransformation(Matrix4 tranformation)
         {
             // Add the new transformation to the list

@@ -223,6 +223,8 @@ namespace RoLabsSlam.Test
         {
             if (_cameraState == CameraState.IsStopped)
             {
+                _render3D.ClearPoints();
+                _render3D.ClearPyramidTransformation();
                 _cameraState = CameraState.IsStarted;
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string projectDir = Directory.GetParent(baseDir).Parent.Parent.FullName;

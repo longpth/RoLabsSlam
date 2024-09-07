@@ -6,7 +6,7 @@
 #include <chrono>  // Include chrono for timing
 #include "Frame.hpp"
 
-extern void FindRtAndTriangulate(
+extern bool FindRtAndTriangulate(
     const cv::Mat& essential_matrix,
     const cv::Mat& cameraMatrix,
     const std::vector<cv::DMatch>& good_matches,
